@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-brain.py — LLM wrapper. Routes messages to OpenRouter/OpenAI-compatible APIs.
+brain.py — LLM wrapper with support for Google Gemini API and OpenRouter/OpenAI compatible APIs.
 All imports lazy — loaded when call_llm() is invoked.
 """
 
@@ -18,7 +18,7 @@ def _load_config() -> Dict:
         Path(__file__).parent.parent / "config.toml",
         Path.home() / ".kage" / "config.toml",
     ]
-    
+
     config_path = None
     for p in config_paths:
         if p.exists():
@@ -53,7 +53,6 @@ def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
     if not content or "action" not in content:
         return None
 
-    # First, try code block extraction
     code_block_match = re.search(r"```(?:json)?\s*(\{[\s\S]*?\})\s*```", content)
     if code_block_match:
         try:
@@ -63,7 +62,6 @@ def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
         except json.JSONDecodeError:
             pass
 
-    # Balanced bracket matcher for nested JSON
     def find_json_objects(text: str) -> List[str]:
         objs = []
         stack = []
@@ -100,22 +98,14 @@ def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
 
 
 def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -> Dict:
-    """Call the LLM and return the response.
-
-    Args:
-        messages: [{"role": "user", "content": "..."}]
-        system: System prompt prepended to messages
-        temperature: Creativity (0-1)
-
-    Returns:
-        {"role": "assistant", "content": "...", "model": "..."}
-    """
+    """Call the LLM (Gemini or OpenRouter/OpenAI compatible) and return response."""
     config = _load_config()
     llm_config = config.get("llm", {})
 
-    api_key = os.environ.get("OPENROUTER_API_KEY") or llm_config.get("api_key", "")
-    base_url = os.environ.get("OPENROUTER_BASE_URL") or llm_config.get("base_url", "https://openrouter.ai/api/v1")
-    model = os.environ.get("OPENROUTER_MODEL") or llm_config.get("model", "anthropic/claude-3.5-sonnet")
+    provider = os.environ.get("LLM_PROVIDER") or llm_config.get("provider", "gemini").lower()
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or llm_config.get("api_key", "")
+    model = os.environ.get("LLM_MODEL") or llm_config.get("model", "gemini-2.5-flash")
+    base_url = os.environ.get("LLM_BASE_URL") or llm_config.get("base_url", "https://openrouter.ai/api/v1")
 
     if not api_key or api_key == "YOUR_KEY_HERE":
         last_msg = messages[-1]["content"] if messages else "no input"
@@ -127,6 +117,71 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 
     import requests
 
+    # 1. Direct Gemini API Integration
+    if provider in ("gemini", "google") or "gemini" in model.lower():
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={api_key}"
+            contents = []
+            for m in messages:
+                role = "model" if m.get("role") in ("assistant", "model") else "user"
+                contents.append({
+                    "role": role,
+                    "parts": [{"text": m.get("content", "")}]
+                })
+
+            payload = {
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": temperature,
+                }
+            }
+
+            if system:
+                payload["systemInstruction"] = {
+                    "parts": [{"text": system}]
+                }
+
+            resp = requests.post(
+                url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=60,
+            )
+            
+            if resp.status_code != 200:
+                err_data = resp.json() if resp.headers.get("content-type") == "application/json" else {}
+                err_msg = err_data.get("error", {}).get("message", resp.text)
+                return {
+                    "role": "assistant",
+                    "content": f"[Gemini Error {resp.status_code}: {err_msg}]",
+                    "model": model,
+                    "error": str(err_msg),
+                }
+
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                return {
+                    "role": "assistant",
+                    "content": text,
+                    "model": model,
+                }
+            else:
+                return {
+                    "role": "assistant",
+                    "content": "[Gemini API returned no candidates]",
+                    "model": model,
+                }
+        except Exception as e:
+            return {
+                "role": "assistant",
+                "content": f"[Gemini LLM Error: {e}]",
+                "model": model,
+                "error": str(e),
+            }
+
+    # 2. OpenRouter / OpenAI-Compatible API Fallback
     full_messages = []
     if system:
         full_messages.append({"role": "system", "content": system})
@@ -167,7 +222,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 KAGE_SYSTEM_PROMPT = """You are Kage — a personal AI assistant running on the user's phone.
 You have access to agents that can:
 - Send WhatsApp messages (action: "whatsapp", task: {"action": "send", "to": "...", "text": "..."})
-- Read/write Obsidian notes (action: "obsidian", task: {"action": "read_file"|"write_file"|"list_files", "path": "..."})
+- Read/write notes in Trilium / TriliumDroid (action: "trilium", task: {"action": "read_note"|"write_note"|"list_notes"|"search", "note_id": "...", "title": "...", "content": "..."})
 - Check phone health (action: "system", task: {})
 - Upgrade yourself (action: "meta", task: {"action": "check"|"pull"})
 
@@ -175,7 +230,7 @@ When the user asks you to execute an action, respond with a JSON action block:
 {"action": "<agent_name>", "task": {<task_data>}}
 
 If no agent is needed, just respond normally.
-Available agents: whatsapp, obsidian, system, meta
+Available agents: whatsapp, trilium, system, meta
 
 Keep responses short and direct. You are efficient — no unnecessary words.
 """

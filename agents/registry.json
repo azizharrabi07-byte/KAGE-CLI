@@ -2,12 +2,12 @@
     "whatsapp": {
         "path": "whatsapp",
         "timeout": 30,
-        "description": "Send and read WhatsApp messages via Baileys"
+        "description": "Send and read WhatsApp messages via Baileys bridge"
     },
-    "obsidian": {
-        "path": "obsidian",
+    "trilium": {
+        "path": "trilium",
         "timeout": 15,
-        "description": "Read/write notes via Obsidian REST API"
+        "description": "Read/write notes via Trilium / TriliumDroid ETapi"
     },
     "meta": {
         "path": "meta",
@@ -17,7 +17,7 @@
     "system": {
         "path": "system",
         "timeout": 10,
-        "description": "Phone health \u2014 battery, storage, CPU"
+        "description": "Phone health — battery, storage, CPU, uptime"
     },
     "tester": {
         "path": "tester",

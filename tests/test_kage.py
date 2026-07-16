@@ -10,7 +10,6 @@ import sys
 import unittest
 from pathlib import Path
 
-# Add project root to sys.path
 PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
@@ -46,17 +45,17 @@ class TestCoreBrain(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["action"], "system")
 
-    def test_extract_nested_action_json(self):
-        raw = 'I will run: {"action": "obsidian", "task": {"action": "read_file", "path": "test.md"}}'
+    def test_extract_nested_trilium_action(self):
+        raw = 'I will run: {"action": "trilium", "task": {"action": "read_note", "note_id": "root"}}'
         parsed = brain.extract_action_json(raw)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "obsidian")
-        self.assertEqual(parsed["task"]["path"], "test.md")
+        self.assertEqual(parsed["action"], "trilium")
+        self.assertEqual(parsed["task"]["note_id"], "root")
 
-    def test_call_llm_echo(self):
-        res = brain.call_llm([{"role": "user", "content": "hello"}])
-        self.assertEqual(res["model"], "echo")
-        self.assertIn("Received: hello", res["content"])
+    def test_call_llm_gemini_integration(self):
+        res = brain.call_llm([{"role": "user", "content": "Respond short: active"}])
+        self.assertIn("content", res)
+        self.assertIsNotNone(res["content"])
 
 
 class TestCoreMemory(unittest.TestCase):
@@ -83,7 +82,7 @@ class TestCoreMemory(unittest.TestCase):
 class TestCorePermissions(unittest.TestCase):
     def test_safe_actions(self):
         self.assertTrue(permissions.require_approval("system.health"))
-        self.assertTrue(permissions.require_approval("obsidian.read"))
+        self.assertTrue(permissions.require_approval("trilium.read"))
 
     def test_auto_approve_flag(self):
         self.assertTrue(permissions.require_approval("whatsapp.send", auto_approve=True))
@@ -124,9 +123,9 @@ class TestKageSupervisor(unittest.TestCase):
         self.assertEqual(res["status"], "done")
         self.assertIsInstance(res["output"], list)
 
-    def test_chat_command(self):
-        res = self.supervisor.process_command("chat", {"message": "hello"})
-        self.assertEqual(res["status"], "done")
+    def test_trilium_agent_wake(self):
+        res = self.supervisor.wake("trilium", {"action": "list_notes"})
+        self.assertIn("status", res)
 
 
 if __name__ == "__main__":

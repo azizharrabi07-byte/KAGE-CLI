@@ -40,14 +40,14 @@ mkdir -p ~/.kage
 if [ ! -f ~/.kage/config.toml ] && [ ! -f "${SCRIPT_DIR}/config.toml" ]; then
     cat > "${SCRIPT_DIR}/config.toml" << 'TOML'
 [llm]
-provider = "openrouter"
-api_key = "YOUR_KEY_HERE"
-model = "anthropic/claude-3.5-sonnet"
-base_url = "https://openrouter.ai/api/v1"
+provider = "gemini"
+api_key = "YOUR_GEMINI_API_KEY_HERE"
+model = "gemini-2.5-flash"
+base_url = "https://generativelanguage.googleapis.com/v1beta"
 
-[obsidian]
-url = "http://localhost:27123"
-api_key = "YOUR_OBSIDIAN_KEY"
+[trilium]
+url = "http://localhost:8080"
+etapi_token = "YOUR_TRILIUM_ETAPI_TOKEN"
 
 [system]
 log_level = "info"

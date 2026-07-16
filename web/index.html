@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>KAGE OS — Terminal Control Dashboard</title>
+    <title>KAGE OS — Unified AI Terminal Dashboard</title>
     <style>
         :root {
             --bg: #050505;
@@ -111,7 +111,6 @@
             display: flex;
         }
 
-        /* Terminal Chat */
         .terminal-window {
             flex: 1;
             display: flex;
@@ -196,7 +195,6 @@
             font-size: 14px;
         }
 
-        /* Tables & Lists */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -218,7 +216,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Grid */
         .grid-cards {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -271,6 +268,16 @@
             color: var(--fg-dim);
             font-size: 12px;
         }
+
+        .section-header {
+            font-size: 13px;
+            font-weight: bold;
+            color: var(--fg-bright);
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 0.4rem;
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
@@ -285,21 +292,22 @@
 ███   ███ ███    █▄  ███    █▄    ███    █▄   ███    ███  ███    █▄  
 ███   ███ ███    ███ ███    ███   ███    ███  ███    ███  ███    ███ 
  ▀█   █▀  ████████▀  ██████████   ██████████   ▀██████▀   ██████████ 
-[ OPENCODE CLI ENGINE • KAGE OS v2.0 • GEMINI 2.5 FLASH ]
+[ UNIFIED AI OS • GEMINI 2.5 FLASH • ALL FEATURES INTEGRATED ]
         </div>
         <div class="sys-status">
             SUPERVISOR: <strong>ONLINE</strong><br>
-            DAEMON IPC: <strong>ACTIVE</strong><br>
+            IPC DAEMON: <strong>ACTIVE</strong><br>
             UNIX SOCK: <strong>~/.kage/kage.sock</strong>
         </div>
     </header>
 
     <div class="nav-bar">
-        <button class="nav-btn active" onclick="tab('chat', event)">[1] Chat Console</button>
-        <button class="nav-btn" onclick="tab('agents', event)">[2] Agents (9)</button>
-        <button class="nav-btn" onclick="tab('health', event)">[3] Telemetry</button>
-        <button class="nav-btn" onclick="tab('traces', event)">[4] Trace History</button>
-        <button class="nav-btn" onclick="tab('schedules', event)">[5] Cron Scheduler</button>
+        <button class="nav-btn active" onclick="tab('chat', event)">[1] Terminal Chat</button>
+        <button class="nav-btn" onclick="tab('features', event)">[2] Integrated Features</button>
+        <button class="nav-btn" onclick="tab('agents', event)">[3] Domain Agents</button>
+        <button class="nav-btn" onclick="tab('health', event)">[4] Telemetry</button>
+        <button class="nav-btn" onclick="tab('traces', event)">[5] Execution Traces</button>
+        <button class="nav-btn" onclick="tab('schedules', event)">[6] Cron Schedules</button>
     </div>
 
     <div class="content-area">
@@ -308,36 +316,80 @@
             <div class="terminal-window">
                 <div class="terminal-output" id="output-box">
                     <div class="log-entry log-assistant">
-                        <span class="prompt-label">[KAGE OS]</span> Kage AI Brain ready. System connected to WhatsApp, Trilium, MCP, Browser, OpenHands, and CrewAI.<br>
-                        Type instructions below e.g. <code>kage chat "Search the web for OpenHands framework"</code>
+                        <span class="prompt-label">[KAGE OS]</span> System initialized with all features integrated natively.<br>
+                        • 🌐 <strong>Browser-Use</strong>: Autonomous web search & page scraping<br>
+                        • 💻 <strong>OpenHands</strong>: Sandboxed terminal & code execution<br>
+                        • 🔌 <strong>MCP Engine</strong>: Local & remote Model Context Protocol servers<br>
+                        • 👥 <strong>CrewAI</strong>: Multi-agent role orchestration<br><br>
+                        Type instructions e.g. <code>kage chat "Search the web for OpenHands AI"</code>
                     </div>
                 </div>
                 <div class="input-line">
                     <span class="prompt-symbol">&gt;</span>
-                    <input type="text" class="cmd-input" id="cmd-input" placeholder="Enter command or message..." onkeypress="if(event.key==='Enter') sendCmd()">
+                    <input type="text" class="cmd-input" id="cmd-input" placeholder="Type instruction for Kage OS..." onkeypress="if(event.key==='Enter') sendCmd()">
                 </div>
             </div>
         </div>
 
-        <!-- Tab 2: Agents -->
+        <!-- Tab 2: Integrated Features -->
+        <div id="pane-features" class="tab-pane">
+            <div class="section-header">Core Built-In Capabilities (Universal Across All Agents)</div>
+            <div class="grid-cards">
+                <div class="mono-card">
+                    <div class="mono-card-title">
+                        <span>BROWSER-USE</span>
+                        <span>[BUILT-IN]</span>
+                    </div>
+                    <div class="mono-card-desc">Live DuckDuckGo search, HTML parsing, and web article text extraction.</div>
+                    <button class="action-btn" onclick="testFeature('browser', 'Search online for OpenHands framework')">TEST SEARCH</button>
+                </div>
+                <div class="mono-card">
+                    <div class="mono-card-title">
+                        <span>OPENHANDS SANDBOX</span>
+                        <span>[BUILT-IN]</span>
+                    </div>
+                    <div class="mono-card-desc">Sandboxed terminal execution, inline Python evaluation, and workspace file editing.</div>
+                    <button class="action-btn" onclick="testFeature('openhands', 'Run Python code: print(2**10)')">TEST SANDBOX</button>
+                </div>
+                <div class="mono-card">
+                    <div class="mono-card-title">
+                        <span>MCP PROTOCOL</span>
+                        <span>[BUILT-IN]</span>
+                    </div>
+                    <div class="mono-card-desc">Model Context Protocol client to query tool & resource definitions from remote MCP servers.</div>
+                    <button class="action-btn" onclick="testFeature('mcp', 'List MCP servers')">TEST MCP</button>
+                </div>
+                <div class="mono-card">
+                    <div class="mono-card-title">
+                        <span>CREWAI ORCHESTRATOR</span>
+                        <span>[BUILT-IN]</span>
+                    </div>
+                    <div class="mono-card-desc">Multi-role task coordinator for sequential agent team execution.</div>
+                    <button class="action-btn" onclick="testFeature('crew', 'Run research writer crew template for AI Operating Systems')">TEST CREW</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Domain Agents -->
         <div id="pane-agents" class="tab-pane">
+            <div class="section-header">Domain Personal Agents</div>
             <div class="grid-cards" id="agents-grid">
                 <!-- Loaded via JS -->
             </div>
         </div>
 
-        <!-- Tab 3: Health & Telemetry -->
+        <!-- Tab 4: Telemetry -->
         <div id="pane-health" class="tab-pane">
             <div class="grid-cards">
                 <div class="mono-card">
-                    <div class="mono-card-title">BATTERY CAPACITY</div>
+                    <div class="mono-card-title">BATTERY LEVEL</div>
                     <div class="stat-val" id="val-battery">--</div>
-                    <div class="stat-sub" id="sub-battery">Source: Termux API / sysfs</div>
+                    <div class="stat-sub">Termux API / Linux sysfs</div>
                 </div>
                 <div class="mono-card">
-                    <div class="mono-card-title">STORAGE MOUNT /</div>
+                    <div class="mono-card-title">STORAGE CAPACITY</div>
                     <div class="stat-val" id="val-storage">--</div>
-                    <div class="stat-sub" id="sub-storage">Used / Total</div>
+                    <div class="stat-sub">Root Disk Space</div>
                 </div>
                 <div class="mono-card">
                     <div class="mono-card-title">SYSTEM UPTIME</div>
@@ -347,14 +399,14 @@
             </div>
         </div>
 
-        <!-- Tab 4: Trace History -->
+        <!-- Tab 5: Traces -->
         <div id="pane-traces" class="tab-pane">
             <table>
                 <thead>
                     <tr>
                         <th>ID</th>
                         <th>Timestamp</th>
-                        <th>Agent</th>
+                        <th>Target</th>
                         <th>Duration</th>
                         <th>Status</th>
                     </tr>
@@ -365,7 +417,7 @@
             </table>
         </div>
 
-        <!-- Tab 5: Cron Scheduler -->
+        <!-- Tab 6: Schedules -->
         <div id="pane-schedules" class="tab-pane">
             <table>
                 <thead>
@@ -404,7 +456,6 @@
 
             const out = document.getElementById('output-box');
 
-            // Render User Log
             const uLog = document.createElement('div');
             uLog.className = 'log-entry log-user';
             uLog.innerHTML = `<span class="prompt-label">[USER]</span> ${escapeHtml(txt)}`;
@@ -444,6 +495,14 @@
                 errLog.innerHTML = `<span class="prompt-label">[ERROR]</span> ${e.message}`;
                 out.appendChild(errLog);
             }
+        }
+
+        function testFeature(feature, prompt) {
+            document.getElementById('cmd-input').value = prompt;
+            // Switch to chat tab and execute prompt
+            const chatBtn = document.querySelectorAll('.nav-btn')[0];
+            tab('chat', {target: chatBtn});
+            sendCmd();
         }
 
         async function loadAgents() {

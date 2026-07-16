@@ -2,7 +2,7 @@
 """
 kage.py — Main daemon / supervisor loop & IPC server.
 Runs background thread pool, listens on Unix domain socket for CLI commands,
-and hosts the background scheduler.
+hosts the background scheduler, and exposes built-in features (Browser-Use, OpenHands, MCP, CrewAI).
 """
 
 import json
@@ -27,7 +27,7 @@ LOG_FILE = KAGE_HOME / "kage.log"
 
 
 class Kage:
-    """The supervisor brain. Wakes agents, manages state."""
+    """The supervisor brain. Wakes agents, manages state, and exposes core features."""
 
     def __init__(self):
         self.running = True
@@ -47,14 +47,25 @@ class Kage:
             pass
 
     def init_context(self):
-        """Initialize the shared context (brain, memory, permissions)."""
+        """Initialize shared context (brain, memory, permissions, and core features)."""
         from core import memory, permissions, scheduler
+        from core.features import BrowserFeature, OpenHandsFeature, MCPFeature, CrewFeature
 
-        self.context = type("Context", (), {
+        ctx = type("Context", (), {
             "brain": self,
             "memory": memory,
             "permissions": permissions,
+            "browser": BrowserFeature(),
+            "openhands": OpenHandsFeature(),
+            "mcp": MCPFeature(),
+            "crew": CrewFeature(),
         })()
+
+        ctx.openhands.context = ctx
+        ctx.mcp.context = ctx
+        ctx.crew.context = ctx
+
+        self.context = ctx
         memory.init_db()
 
         # Initialize background scheduler
@@ -62,7 +73,7 @@ class Kage:
         self._load_schedules_into_scheduler()
         self.scheduler.start()
 
-        self.log("Context and scheduler initialized")
+        self.log("Context, core features, and scheduler initialized")
 
     def _load_schedules_into_scheduler(self):
         """Load saved schedule jobs from database into scheduler."""
@@ -162,11 +173,13 @@ class Kage:
         return result
 
     def process_command(self, command: str, args: dict) -> dict:
-        """Process a CLI command and return the result."""
+        """Process a CLI command or feature call."""
         if command == "chat":
             return self._handle_chat(args.get("message", ""))
         elif command == "agent":
             return self._handle_agent_command(args)
+        elif command == "features":
+            return self._handle_features_command(args)
         elif command == "trace":
             return self._handle_trace(args)
         elif command == "health":
@@ -182,7 +195,7 @@ class Kage:
             return {"status": "error", "output": f"Unknown command: {command}"}
 
     def _handle_chat(self, message: str) -> dict:
-        """Route a chat message through the brain."""
+        """Route a chat message through brain and execute requested feature or agent action."""
         from core.brain import call_llm, extract_action_json, KAGE_SYSTEM_PROMPT
 
         result = call_llm(
@@ -194,10 +207,48 @@ class Kage:
 
         action = extract_action_json(content)
         if action:
-            agent_name = action.get("action", "")
+            action_type = action.get("action", "")
             task_data = action.get("task", {})
-            if agent_name:
-                agent_result = self.wake(agent_name, task_data)
+
+            # 1. Feature direct invocation
+            if action_type == "browser":
+                fn = task_data.get("action", "search")
+                if fn == "search":
+                    res = self.context.browser.search(task_data.get("query", ""))
+                else:
+                    res = self.context.browser.fetch(task_data.get("url", task_data.get("query", "")))
+                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
+
+            elif action_type == "openhands":
+                fn = task_data.get("action", "execute_cmd")
+                if fn in ("execute_cmd", "cmd"):
+                    res = self.context.openhands.execute_cmd(task_data.get("command", ""))
+                elif fn == "run_python":
+                    res = self.context.openhands.run_python(task_data.get("code", ""))
+                else:
+                    res = self.context.openhands.write_code(task_data.get("path", ""), task_data.get("content", ""))
+                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
+
+            elif action_type == "mcp":
+                fn = task_data.get("action", "list_servers")
+                if fn == "list_servers":
+                    res = self.context.mcp.list_servers()
+                else:
+                    res = self.context.mcp.call_tool(task_data.get("server", ""), task_data.get("tool", ""), task_data.get("args", {}))
+                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
+
+            elif action_type == "crew":
+                res = self.context.crew.run_crew(
+                    crew_agents=task_data.get("agents", []),
+                    tasks=task_data.get("tasks", []),
+                    template=task_data.get("template", ""),
+                    topic=task_data.get("topic", "")
+                )
+                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
+
+            # 2. Domain Agent invocation
+            elif action_type:
+                agent_result = self.wake(action_type, task_data)
                 return {
                     "status": "done",
                     "input": message,
@@ -207,20 +258,53 @@ class Kage:
 
         return {"status": "done", "input": message, "response": content}
 
+    def _handle_features_command(self, args: dict) -> dict:
+        """Expose built-in feature execution via CLI."""
+        feat = args.get("feature", "")
+        action = args.get("action", "")
+
+        if feat == "browser":
+            if action == "search":
+                res = self.context.browser.search(args.get("query", ""))
+            else:
+                res = self.context.browser.fetch(args.get("url", ""))
+            return {"status": "done", "output": res}
+
+        elif feat == "openhands":
+            if action in ("execute_cmd", "cmd"):
+                res = self.context.openhands.execute_cmd(args.get("command", ""))
+            elif action == "run_python":
+                res = self.context.openhands.run_python(args.get("code", ""))
+            else:
+                res = self.context.openhands.write_code(args.get("path", ""), args.get("content", ""))
+            return {"status": "done", "output": res}
+
+        elif feat == "mcp":
+            if action == "list_servers":
+                res = self.context.mcp.list_servers()
+            else:
+                res = self.context.mcp.call_tool(args.get("server", ""), args.get("tool", ""), args.get("args", {}))
+            return {"status": "done", "output": res}
+
+        elif feat == "crew":
+            res = self.context.crew.run_crew([], [], template=args.get("template", ""), topic=args.get("topic", ""))
+            return {"status": "done", "output": res}
+
+        return {"status": "error", "output": f"Unknown feature: {feat}"}
+
     def _handle_agent_command(self, args: dict) -> dict:
         """Handle agent subcommands."""
         sub = args.get("subcmd", "list")
 
         if sub == "list":
             registry_path = self.agents_dir / "registry.json"
+            registry = {}
             if registry_path.exists():
                 try:
                     with open(registry_path, "r", encoding="utf-8") as f:
                         registry = json.load(f)
                 except Exception:
                     registry = {}
-            else:
-                registry = {}
 
             result = []
             for name, info in registry.items():
@@ -279,7 +363,6 @@ class Agent:
             self.sleep()
 
     def execute(self, task_data: dict) -> dict:
-        # Implement custom agent logic
         action = task_data.get("action", "default")
         return {{"status": "done", "output": f"Agent {name} executed action: {{action}}"}}
 
@@ -383,6 +466,7 @@ class Agent:
                 "agents_registered": agent_count,
                 "agents_loaded": loaded,
                 "agents_awake": awake,
+                "built_in_features": ["browser_use", "openhands_sandbox", "mcp_engine", "crewai_orchestrator"],
                 "scheduled_jobs": scheduled_jobs,
                 "uptime": "running",
                 "kage_dir": str(KAGE_DIR),
@@ -515,11 +599,9 @@ def main():
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
 
-    # CLI Direct Invocation (e.g. `python3 kage.py chat "hello"`)
     if len(sys.argv) > 1:
         cmd = sys.argv[1]
         if cmd == "daemon":
-            # Start background daemon
             if is_socket_alive():
                 print("[KAGE] Supervisor daemon is already running.")
                 return
@@ -533,7 +615,6 @@ def main():
                 kage.shutdown()
             return
 
-        # Parse command args
         args = {}
         if len(sys.argv) > 2:
             try:
@@ -541,14 +622,12 @@ def main():
             except Exception:
                 args = {"raw_arg": sys.argv[2]}
 
-        # If daemon is active, forward request via IPC socket
         if is_socket_alive():
             daemon_result = send_to_daemon(cmd, args)
             if daemon_result is not None:
                 print(json.dumps(daemon_result, indent=2, default=str))
                 return
 
-        # Fallback to one-shot execution
         kage.init_context()
         result = kage.process_command(cmd, args)
         print(json.dumps(result, indent=2, default=str))
@@ -556,7 +635,6 @@ def main():
             kage.scheduler.stop()
         return
 
-    # Non-interactive / piped stdin invocation
     elif not sys.stdin.isatty():
         if is_socket_alive():
             try:

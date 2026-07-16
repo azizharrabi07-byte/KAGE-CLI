@@ -9,35 +9,15 @@
         "timeout": 15,
         "description": "Read/write notes via Trilium / TriliumDroid ETapi"
     },
-    "mcp": {
-        "path": "mcp",
-        "timeout": 30,
-        "description": "Model Context Protocol Client for remote/local tool servers (Awesome MCP)"
-    },
-    "browser": {
-        "path": "browser",
-        "timeout": 30,
-        "description": "Autonomous web search, page fetching, and article extraction (browser-use)"
-    },
-    "openhands": {
-        "path": "openhands",
-        "timeout": 30,
-        "description": "Sandbox workspace execution, code editing, and system control (OpenHands)"
-    },
-    "crew": {
-        "path": "crew",
-        "timeout": 60,
-        "description": "Multi-agent crew orchestration and sequential role-playing tasks (CrewAI)"
+    "system": {
+        "path": "system",
+        "timeout": 10,
+        "description": "Phone health — battery, storage, CPU, uptime"
     },
     "meta": {
         "path": "meta",
         "timeout": 60,
         "description": "Self-upgrade via git pull"
-    },
-    "system": {
-        "path": "system",
-        "timeout": 10,
-        "description": "Phone health — battery, storage, CPU, uptime"
     },
     "tester": {
         "path": "tester",

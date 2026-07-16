@@ -1,78 +1,23 @@
 #!/usr/bin/env python3
 """
-Browser Agent — Autonomous Web Search & Article Extraction Agent for KAGE OS.
-Inspired by https://github.com/browser-use/browser-use
-Actions: search, fetch, read, extract_links, browse
+Browser-Use Feature — Native Web Searching, Page Fetching & Link Extraction for KAGE OS.
+Available to all agents and brain via context.browser
+Reference: https://github.com/browser-use/browser-use
 """
 
-import gc
 import json
-import os
 import re
-import sys
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
-from urllib.parse import urlparse, quote_plus
+from typing import Dict, List, Optional
+from urllib.parse import urlparse, quote_plus, parse_qs
 
 
-class Agent:
-    def __init__(self, context):
-        self.context = context
-        self.alive = False
+class BrowserFeature:
+    """Built-in Web Browsing & Search Feature."""
 
-    def wake(self, task_data: dict) -> dict:
-        """Wake up: import networking and HTML parsing libraries."""
-        global requests
-        import requests as _requests
-        requests = _requests
+    def search(self, query: str, max_results: int = 5) -> List[Dict]:
+        """Perform a web search using DuckDuckGo HTML parser."""
+        import requests
 
-        self.alive = True
-        try:
-            return self.execute(task_data)
-        finally:
-            self.sleep()
-
-    def execute(self, task_data: dict) -> dict:
-        action = task_data.get("action", "search")
-        query = task_data.get("query", task_data.get("search", ""))
-        url = task_data.get("url", "")
-        max_results = task_data.get("max_results", 5)
-
-        try:
-            if action == "search":
-                if not query:
-                    return {"status": "error", "output": "Missing 'query' parameter for search"}
-                results = self._search_web(query, max_results)
-                return {"status": "done", "output": results}
-
-            elif action in ("fetch", "read", "browse"):
-                target_url = url or query
-                if not target_url:
-                    return {"status": "error", "output": "Missing 'url' parameter for fetch/browse"}
-                if not target_url.startswith(("http://", "https://")):
-                    target_url = "https://" + target_url
-
-                content = self._fetch_url(target_url)
-                return {"status": "done", "output": content}
-
-            elif action == "extract_links":
-                target_url = url or query
-                if not target_url:
-                    return {"status": "error", "output": "Missing 'url' parameter"}
-                if not target_url.startswith(("http://", "https://")):
-                    target_url = "https://" + target_url
-
-                links = self._extract_links(target_url)
-                return {"status": "done", "output": links}
-
-            else:
-                return {"status": "error", "output": f"Unknown action: {action}"}
-
-        except Exception as e:
-            return {"status": "error", "output": str(e)}
-
-    def _search_web(self, query: str, max_results: int = 5) -> List[Dict]:
-        """Perform a web search using HTML endpoint and extract top organic results."""
         search_url = f"https://html.duckduckgo.com/html/?q={quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -83,7 +28,6 @@ class Agent:
         html = resp.text
         results = []
 
-        # Parse organic links and titles from DuckDuckGo HTML
         matches = re.findall(
             r'<a class="result__url"[^>]*href="([^"]+)"[^>]*>\s*(.*?)\s*</a>[\s\S]*?<a class="result__snippet[^"]*"[^>]*>([\s\S]*?)</a>',
             html,
@@ -95,9 +39,7 @@ class Agent:
             clean_title = re.sub(r"<[^>]+>", "", title).strip()
             clean_snippet = re.sub(r"<[^>]+>", "", snippet).strip()
 
-            # Clean DuckDuckGo redirect URLs
             if "uddg=" in raw_url:
-                from urllib.parse import parse_qs
                 parsed = parse_qs(urlparse(raw_url).query)
                 real_url = parsed.get("uddg", [raw_url])[0]
             else:
@@ -110,7 +52,6 @@ class Agent:
             })
 
         if not results:
-            # Fallback regex matcher for title links
             links = re.findall(r'<a[^>]+class="result__a"[^>]+href="([^"]+)"[^>]*>(.*?)</a>', html)
             for link, title in links[:max_results]:
                 results.append({
@@ -121,8 +62,13 @@ class Agent:
 
         return results
 
-    def _fetch_url(self, url: str) -> Dict:
-        """Fetch URL content and clean up readable text."""
+    def fetch(self, url: str) -> Dict:
+        """Fetch target URL content and extract clean readable text."""
+        import requests
+
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
@@ -137,7 +83,6 @@ class Agent:
                 pass
 
         html = resp.text
-        # Clean HTML tags to extract clean text
         text = re.sub(r"<script[\s\S]*?</script>", "", html, flags=re.IGNORECASE)
         text = re.sub(r"<style[\s\S]*?</style>", "", text, flags=re.IGNORECASE)
         text = re.sub(r"<[^>]+>", " ", text)
@@ -150,12 +95,17 @@ class Agent:
         return {
             "url": url,
             "title": page_title,
-            "text": clean_text[:4000],  # Truncate to safe LLM context budget
+            "text": clean_text[:4000],
             "total_length": len(clean_text),
         }
 
-    def _extract_links(self, url: str) -> Dict:
-        """Extract all external/internal hyperlinks from target webpage."""
+    def extract_links(self, url: str) -> Dict:
+        """Extract all external/internal hyperlinks from webpage."""
+        import requests
+
+        if not url.startswith(("http://", "https://")):
+            url = "https://" + url
+
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         }
@@ -173,7 +123,3 @@ class Agent:
                 links.append({"url": link_url, "text": clean_text or link_url})
 
         return {"url": url, "total_links": len(links), "links": links[:30]}
-
-    def sleep(self):
-        self.alive = False
-        gc.collect()

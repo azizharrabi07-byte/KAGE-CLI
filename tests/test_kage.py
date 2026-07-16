@@ -45,11 +45,11 @@ class TestCoreBrain(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["action"], "system")
 
-    def test_extract_nested_mcp_action(self):
-        raw = 'I will run: {"action": "mcp", "task": {"action": "call_tool", "tool": "fetch"}}'
+    def test_extract_nested_feature_action(self):
+        raw = 'I will run: {"action": "browser", "task": {"action": "search", "query": "Python"}}'
         parsed = brain.extract_action_json(raw)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "mcp")
+        self.assertEqual(parsed["action"], "browser")
 
     def test_call_llm_gemini_integration(self):
         res = brain.call_llm([{"role": "user", "content": "Respond short: active"}])
@@ -88,29 +88,30 @@ class TestCorePermissions(unittest.TestCase):
         self.assertTrue(permissions.require_approval("openhands.execute_cmd", auto_approve=True))
 
 
-class TestNewAgents(unittest.TestCase):
+class TestBuiltInFeatures(unittest.TestCase):
     def setUp(self):
         self.supervisor = kage.Kage()
         self.supervisor.init_context()
 
-    def test_mcp_agent_wake(self):
-        res = self.supervisor.wake("mcp", {"action": "list_servers"})
-        self.assertEqual(res["status"], "done")
-        self.assertIsInstance(res["output"], list)
+    def test_browser_feature_context(self):
+        self.assertTrue(hasattr(self.supervisor.context, "browser"))
+        results = self.supervisor.context.browser.search("Python")
+        self.assertIsInstance(results, list)
 
-    def test_browser_agent_wake(self):
-        res = self.supervisor.wake("browser", {"action": "search", "query": "Python"})
-        self.assertEqual(res["status"], "done")
+    def test_openhands_feature_context(self):
+        self.assertTrue(hasattr(self.supervisor.context, "openhands"))
+        res = self.supervisor.context.openhands.execute_cmd("echo 'hello'", require_approval=False)
+        self.assertEqual(res["stdout"], "hello")
 
-    def test_openhands_agent_wake(self):
-        res = self.supervisor.wake("openhands", {"action": "status"})
-        self.assertEqual(res["status"], "done")
-        self.assertIn("workspace", res["output"])
+    def test_mcp_feature_context(self):
+        self.assertTrue(hasattr(self.supervisor.context, "mcp"))
+        servers = self.supervisor.context.mcp.list_servers()
+        self.assertIsInstance(servers, list)
 
-    def test_crew_agent_wake(self):
-        res = self.supervisor.wake("crew", {"action": "list_templates"})
-        self.assertEqual(res["status"], "done")
-        self.assertIsInstance(res["output"], list)
+    def test_crew_feature_context(self):
+        self.assertTrue(hasattr(self.supervisor.context, "crew"))
+        templates = self.supervisor.context.crew.list_templates()
+        self.assertIsInstance(templates, list)
 
 
 if __name__ == "__main__":

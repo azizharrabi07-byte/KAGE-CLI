@@ -4,13 +4,14 @@ kage_cli.py — User-facing CLI for KAGE OS.
 
 Usage:
   kage chat "message"
+  kage web [--port 8080]
   kage agent list
   kage agent wake <name> --task '{"key":"val"}'
   kage agent create <name>
   kage trace list
   kage trace show <id>
   kage health
-  kage schedule add --cron "0 9 * * *" --agent obsidian --task '{"action":"daily_summary"}'
+  kage schedule add --cron "0 9 * * *" --agent system --task '{"action":"health"}'
   kage schedule list
   kage schedule delete <job_id>
   kage daemon start|stop|status
@@ -55,7 +56,7 @@ def run_kage(command: str, args: dict = None) -> dict:
             if data:
                 return json.loads(data.decode("utf-8").strip())
         except Exception:
-            pass  # Fall back to subshell direct execution
+            pass
 
     # 2. Direct execution fallback
     try:
@@ -100,6 +101,13 @@ def cmd_chat(args):
         print(f"Error: {result.get('output', 'unknown')}")
 
 
+def cmd_web(args):
+    """Start KAGE OS Web Landing Page & Control Dashboard."""
+    port = getattr(args, "port", 8080)
+    print(f"🌐 Launching KAGE OS Dashboard on http://localhost:{port} ...")
+    subprocess.run([PYTHON, str(KAGE_DIR / "core" / "web_ui.py"), str(port)], cwd=str(KAGE_DIR))
+
+
 def cmd_agent(args):
     """Agent management."""
     sub = getattr(args, "subcmd", "list") or "list"
@@ -109,7 +117,7 @@ def cmd_agent(args):
         if result.get("status") == "done":
             agents = result.get("output", [])
             print(f"\n{'Name':<15} {'Status':<10} {'Description'}")
-            print("─" * 65)
+            print("─" * 70)
             for a in agents:
                 print(f"{a['name']:<15} {a['status']:<10} {a.get('description', '')}")
         else:
@@ -307,6 +315,10 @@ def main():
     p_chat = subparsers.add_parser("chat", help="Chat with Kage LLM brain")
     p_chat.add_argument("message", help="Message or instruction")
 
+    # web
+    p_web = subparsers.add_parser("web", help="Start KAGE OS Web Landing Page & Dashboard")
+    p_web.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
+
     # agent
     p_agent = subparsers.add_parser("agent", help="Agent management")
     agent_sub = p_agent.add_subparsers(dest="subcmd")
@@ -354,6 +366,7 @@ def main():
 
     dispatch = {
         "chat": cmd_chat,
+        "web": cmd_web,
         "agent": cmd_agent,
         "trace": cmd_trace,
         "health": cmd_health,

@@ -1,6 +1,6 @@
 # KAGE OS — Personal AI Agent System
 
-A modular, high-performance CLI-based AI operating system for your phone (Termux/Android), Linux, and macOS. Powered natively by Google Gemini 2.5 Flash and connected to phone health, WhatsApp, Trilium / TriliumDroid notes, Model Context Protocol (MCP) servers, autonomous web browsing, and software control sandboxes.
+A modular, high-performance CLI & Web-based AI operating system for your phone (Termux/Android), Linux, and macOS. Powered natively by Google Gemini 2.5 Flash, equipped with an interactive OpenCode/OpenClaude-style Web Landing Page, multi-agent CrewAI orchestration, Model Context Protocol (MCP) server support, browser web searching, software execution sandboxes, WhatsApp, Trilium Notes, and phone health monitoring.
 
 ## Architecture & Agents
 
@@ -9,18 +9,20 @@ A modular, high-performance CLI-based AI operating system for your phone (Termux
   - `memory.py`: SQLite WAL database for trace logging, workflows, and cron schedule persistence (`kage.db`).
   - `permissions.py`: Safety permission model distinguishing read/health checks from sensitive actions.
   - `scheduler.py`: Background cron-style task scheduler with minute-level execution tracking.
+  - `web_ui.py`: Built-in HTTP web server serving the Control Dashboard on `http://localhost:8080`.
 - **`agents/`**
+  - `crew`: [CrewAI](https://github.com/crewAIInc/crewAI) multi-agent crew orchestration for multi-role sequential workflows (e.g. Researcher, Writer, Developer, Reviewer).
+  - `mcp`: [Awesome MCP](https://github.com/punkpeye/awesome-mcp-servers) client bridge connecting Kage to remote and local Model Context Protocol tool & resource servers (JSON-RPC 2.0).
+  - `browser`: [browser-use](https://github.com/browser-use/browser-use) web browsing agent for live web searches, article fetching, HTML link parsing, and content extraction.
+  - `openhands`: [OpenHands](https://github.com/OpenHands/OpenHands) software execution & control agent for sandboxed terminal command execution, python evaluation, and file writing.
   - `whatsapp`: Baileys microservice bridge (`localhost:3030`) with persistent background process and JID auto-formatting.
   - `trilium`: [TriliumDroid](https://github.com/FliegendeWurst/TriliumDroid) / Trilium Notes ETapi integration for mobile hierarchical note management.
-  - `mcp`: [Awesome MCP](https://github.com/punkpeye/awesome-mcp-servers) client bridge connecting Kage to remote and local Model Context Protocol tool & resource servers (JSON-RPC 2.0).
-  - `browser`: [browser-use](https://github.com/browser-use/browser-use) inspired web browsing agent for live web searches, article fetching, HTML link parsing, and content extraction.
-  - `openhands`: [OpenHands](https://github.com/OpenHands/OpenHands) inspired software execution & control agent for sandboxed terminal command execution, python evaluation, and file writing.
   - `system`: Cross-platform phone health inspection (battery, storage, CPU load, uptime).
   - `meta`: Self-upgrade agent for automated `git pull`, automated testing, and daemon reload.
-- **`skills/`**
-  - `helpers.py`: Hot-reloadable utility functions and safe JSON parser.
+- **`web/`**: Interactive OpenCode / OpenClaude / OpenHands-style landing page dashboard (`index.html`).
+- **`skills/`**: Hot-reloadable utility functions and safe JSON parser (`helpers.py`).
 - **`kage.py`**: Background supervisor daemon and Unix socket IPC server (`~/.kage/kage.sock`).
-- **`kage_cli.py`**: Rich user CLI frontend.
+- **`kage_cli.py`**: Rich user CLI frontend with `kage web` launcher.
 - **`tests/`**: Comprehensive automated test suite.
 
 ## Install
@@ -33,40 +35,41 @@ bash setup.sh
 
 ## Quick Start & Usage
 
-### 1. Daemon Management
+### 1. Web Dashboard Landing Page
+Launch the interactive web UI to speak with your agents and monitor phone telemetry:
+```bash
+kage web --port 8080
+```
+Open **`http://localhost:8080`** in your browser!
+
+### 2. Daemon Management
 ```bash
 kage daemon start      # Start the background supervisor service
 kage daemon status     # Check daemon and system status
 kage daemon stop       # Safely stop the supervisor daemon
 ```
 
-### 2. General CLI Commands
+### 3. CLI Interaction
 ```bash
 kage status            # Show registered agents, loaded memory, active schedules
 kage health            # Check phone battery, storage, CPU load, and uptime
 kage chat "hello"      # Direct interaction with Kage AI brain (Gemini 2.5)
 ```
 
-### 3. Agent Capabilities
+### 4. Agent Capabilities & Multi-Agent Crews
 ```bash
-kage agent list        # List all 8 registered agents and status
+kage agent list        # List all 9 registered agents and status
 kage chat "Search the web for OpenHands AI agent framework"
+kage agent wake crew --task '{"action":"run_crew", "template":"research_writer", "topic":"Quantum Computing"}'
 kage agent wake browser --task '{"action":"search", "query":"Model Context Protocol"}'
 kage agent wake mcp --task '{"action":"list_servers"}'
 kage agent wake openhands --task '{"action":"status"}'
 kage agent wake trilium --task '{"action":"list_notes"}'
-kage agent create mybot # Scaffold a new agent directory
 ```
 
-### 4. Scheduler (Cron Jobs)
+### 5. Scheduler (Cron Jobs) & Execution Traces
 ```bash
 kage schedule add --cron "0 9 * * *" --agent system --task '{"action":"health"}'
-kage schedule list
-kage schedule delete 1
-```
-
-### 5. Execution Traces
-```bash
 kage trace list        # View recent execution history
 kage trace show 1      # Detailed view of trace ID 1
 ```
@@ -76,30 +79,4 @@ kage trace show 1      # Detailed view of trace ID 1
 Run the complete test suite:
 ```bash
 python3 -m unittest discover -s tests
-```
-
-## Configuration
-
-Settings live in `config.toml` or `~/.kage/config.toml`:
-```toml
-[llm]
-provider = "gemini"
-api_key = "YOUR_GEMINI_API_KEY_HERE"
-model = "gemini-2.5-flash"
-base_url = "https://generativelanguage.googleapis.com/v1beta"
-
-[trilium]
-url = "http://localhost:8080"
-etapi_token = "YOUR_TRILIUM_ETAPI_TOKEN"
-
-[mcp]
-servers = [
-    { name = "fetch", url = "http://localhost:8000/mcp" },
-    { name = "filesystem", url = "http://localhost:8001/mcp" }
-]
-
-[system]
-log_level = "info"
-max_retries = 3
-timeout = 30
 ```

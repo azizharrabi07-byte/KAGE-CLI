@@ -24,6 +24,11 @@
         "timeout": 30,
         "description": "Sandbox workspace execution, code editing, and system control (OpenHands)"
     },
+    "crew": {
+        "path": "crew",
+        "timeout": 60,
+        "description": "Multi-agent crew orchestration and sequential role-playing tasks (CrewAI)"
+    },
     "meta": {
         "path": "meta",
         "timeout": 60,

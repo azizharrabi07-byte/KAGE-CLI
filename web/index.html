@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KAGE OS — Personal AI Agent System</title>
+    <style>
+        :root {
+            --bg-dark: #0d0f17;
+            --card-bg: #161a26;
+            --card-border: #232a3d;
+            --accent-purple: #8b5cf6;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-rose: #f43f5e;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --font-mono: 'JetBrains Mono', 'Fira Code', 'Roboto Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        header {
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            font-weight: 900;
+            padding: 0.4rem 0.8rem;
+            border-radius: 8px;
+            font-size: 1.2rem;
+            letter-spacing: 1px;
+            box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+        }
+
+        .logo-text {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .badge-status {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0.5rem;
+            background: var(--card-bg);
+            border-bottom: 1px solid var(--card-border);
+            padding: 0 2rem;
+        }
+
+        .nav-tab {
+            padding: 0.85rem 1.25rem;
+            color: var(--text-muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tab:hover {
+            color: var(--text-main);
+        }
+
+        .nav-tab.active {
+            color: var(--accent-purple);
+            border-bottom-color: var(--accent-purple);
+        }
+
+        main {
+            flex: 1;
+            padding: 2rem;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Hero / Overview Grid */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .metric-val {
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text-main);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-sub {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Chat Interface */
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 240px);
+            min-height: 500px;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 1.5rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .msg {
+            max-width: 80%;
+            padding: 1rem 1.25rem;
+            border-radius: 12px;
+            line-height: 1.5;
+            font-size: 0.95rem;
+        }
+
+        .msg-user {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--accent-purple), var(--accent-blue));
+            color: #fff;
+            border-bottom-right-radius: 2px;
+        }
+
+        .msg-assistant {
+            align-self: flex-start;
+            background: #1e2433;
+            border: 1px solid var(--card-border);
+            border-bottom-left-radius: 2px;
+        }
+
+        .msg-agent-output {
+            margin-top: 0.75rem;
+            padding: 0.75rem;
+            background: #0f131d;
+            border-radius: 8px;
+            border-left: 3px solid var(--accent-amber);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            overflow-x: auto;
+            white-space: pre-wrap;
+        }
+
+        .chat-input-row {
+            padding: 1rem 1.5rem;
+            background: #121622;
+            border-top: 1px solid var(--card-border);
+            display: flex;
+            gap: 1rem;
+        }
+
+        input[type="text"], textarea {
+            flex: 1;
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 0.75rem 1rem;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus, textarea:focus {
+            border-color: var(--accent-purple);
+        }
+
+        .btn {
+            background: var(--accent-purple);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem 1.5rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+
+        /* Agents Grid */
+        .agents-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .agent-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .agent-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .agent-desc {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            line-height: 1.4;
+            margin-bottom: 1.25rem;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.85rem 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        th {
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        tr:hover {
+            background: rgba(255,255,255,0.02);
+        }
+
+        pre {
+            font-family: var(--font-mono);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-group">
+            <div class="logo-icon">KAGE</div>
+            <div>
+                <div class="logo-text">KAGE OS Dashboard</div>
+                <div style="font-size: 0.75rem; color: var(--text-muted);">Personal AI Agent System • Powered by Gemini 2.5 Flash</div>
+            </div>
+        </div>
+        <div class="badge-status">
+            <div class="pulse-dot"></div>
+            <span>Supervisor Active</span>
+        </div>
+    </header>
+
+    <div class="nav-tabs">
+        <div class="nav-tab active" onclick="switchTab('chat')">💬 Live Chat</div>
+        <div class="nav-tab" onclick="switchTab('health')">📊 Phone Telemetry</div>
+        <div class="nav-tab" onclick="switchTab('agents')">🤖 Agent Hub (8)</div>
+        <div class="nav-tab" onclick="switchTab('traces')">📜 Execution Traces</div>
+        <div class="nav-tab" onclick="switchTab('schedules')">⏰ Cron Schedules</div>
+    </div>
+
+    <main>
+        <!-- Tab 1: Live Chat -->
+        <div id="tab-chat" class="tab-content active">
+            <div class="chat-container">
+                <div class="chat-messages" id="chat-box">
+                    <div class="msg msg-assistant">
+                        👋 Hello! I am <strong>Kage</strong>, your AI Operating System assistant. <br>
+                        I can execute commands across <strong>WhatsApp</strong>, <strong>Trilium Notes</strong>, <strong>Web Search</strong>, <strong>MCP Tool Servers</strong>, and <strong>OpenHands Code Sandbox</strong>.
+                    </div>
+                </div>
+                <div class="chat-input-row">
+                    <input type="text" id="chat-input" placeholder="Type a instruction e.g. 'Search the web for OpenHands AI' or 'Check phone health'..." onkeypress="if(event.key==='Enter') sendMessage()">
+                    <button class="btn" onclick="sendMessage()">Send Command</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 2: Health & Telemetry -->
+        <div id="tab-health" class="tab-content">
+            <div class="grid-3" id="health-metrics">
+                <div class="card">
+                    <div class="card-header">Battery Status</div>
+                    <div class="metric-val" id="bat-val">100%</div>
+                    <div class="metric-sub" id="bat-sub">Source: System</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">Storage Capacity</div>
+                    <div class="metric-val" id="storage-val">-- / --</div>
+                    <div class="metric-sub" id="storage-sub">Mount: /</div>
+                </div>
+                <div class="card">
+                    <div class="card-header">System Uptime</div>
+                    <div class="metric-val" id="uptime-val">--</div>
+                    <div class="metric-sub">Linux/Termux Kernel</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Agents Hub -->
+        <div id="tab-agents" class="tab-content">
+            <div class="agents-grid" id="agents-list">
+                <!-- Loaded dynamically -->
+            </div>
+        </div>
+
+        <!-- Tab 4: Execution Traces -->
+        <div id="tab-traces" class="tab-content">
+            <div class="card">
+                <div class="card-header">Execution Trace Log</div>
+                <table id="traces-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Timestamp</th>
+                            <th>Agent</th>
+                            <th>Duration</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="traces-body">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Tab 5: Cron Schedules -->
+        <div id="tab-schedules" class="tab-content">
+            <div class="card">
+                <div class="card-header">Scheduled Tasks (Cron)</div>
+                <table id="schedules-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Cron Expression</th>
+                            <th>Target Agent</th>
+                            <th>Task Data</th>
+                        </tr>
+                    </thead>
+                    <tbody id="schedules-body">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function switchTab(tabName) {
+            document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            event.target.classList.add('active');
+            document.getElementById(`tab-${tabName}`).classList.add('active');
+
+            if(tabName === 'health') loadHealth();
+            if(tabName === 'agents') loadAgents();
+            if(tabName === 'traces') loadTraces();
+            if(tabName === 'schedules') loadSchedules();
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const msgText = input.value.trim();
+            if(!msgText) return;
+
+            const box = document.getElementById('chat-box');
+            
+            // Render user message
+            const uDiv = document.createElement('div');
+            uDiv.className = 'msg msg-user';
+            uDiv.textContent = msgText;
+            box.appendChild(uDiv);
+
+            input.value = '';
+            box.scrollTop = box.scrollHeight;
+
+            // Call API
+            try {
+                const res = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({message: msgText})
+                });
+                const data = await res.json();
+
+                const aDiv = document.createElement('div');
+                aDiv.className = 'msg msg-assistant';
+                let text = data.response || data.brain_response || "Command executed.";
+                aDiv.innerHTML = text.replace(/\n/g, '<br>');
+
+                if(data.agent_result) {
+                    const outPre = document.createElement('div');
+                    outPre.className = 'msg-agent-output';
+                    outPre.textContent = typeof data.agent_result.output === 'object' 
+                        ? JSON.stringify(data.agent_result.output, null, 2) 
+                        : data.agent_result.output;
+                    aDiv.appendChild(outPre);
+                }
+
+                box.appendChild(aDiv);
+                box.scrollTop = box.scrollHeight;
+            } catch(e) {
+                const eDiv = document.createElement('div');
+                aDiv.className = 'msg msg-assistant';
+                aDiv.textContent = 'Error: ' + e.message;
+                box.appendChild(eDiv);
+            }
+        }
+
+        async function loadHealth() {
+            const res = await fetch('/api/health');
+            const data = await res.json();
+            if(data.output) {
+                const o = data.output;
+                if(o.battery) document.getElementById('bat-val').textContent = (o.battery.percentage || 100) + '%';
+                if(o.storage) document.getElementById('storage-val').textContent = (o.storage.used || '?') + ' / ' + (o.storage.total || '?');
+                if(o.uptime) document.getElementById('uptime-val').textContent = o.uptime;
+            }
+        }
+
+        async function loadAgents() {
+            const res = await fetch('/api/agents');
+            const data = await res.json();
+            const grid = document.getElementById('agents-list');
+            grid.innerHTML = '';
+
+            if(data.output) {
+                data.output.forEach(a => {
+                    const card = document.createElement('div');
+                    card.className = 'agent-card';
+                    card.innerHTML = `
+                        <div>
+                            <div class="agent-name">🤖 ${a.name} <span style="font-size: 0.75rem; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 2px 8px; border-radius: 12px;">${a.status}</span></div>
+                            <div class="agent-desc">${a.description}</div>
+                        </div>
+                        <button class="btn" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="wakeAgent('${a.name}')">Wake Agent</button>
+                    `;
+                    grid.appendChild(card);
+                });
+            }
+        }
+
+        async function wakeAgent(name) {
+            const res = await fetch('/api/wake', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({agent: name, task: {}})
+            });
+            const data = await res.json();
+            alert(`Agent ${name} Output:\n` + JSON.stringify(data, null, 2));
+        }
+
+        async function loadTraces() {
+            const res = await fetch('/api/traces');
+            const data = await res.json();
+            const tbody = document.getElementById('traces-body');
+            tbody.innerHTML = '';
+
+            if(data.output) {
+                data.output.forEach(t => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${t.id}</td>
+                        <td>${(t.timestamp || '').substring(0,19)}</td>
+                        <td><strong>${t.agent}</strong></td>
+                        <td>${Math.round(t.duration_ms || 0)}ms</td>
+                        <td>${t.error ? '❌ Error' : '✅ Success'}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        async function loadSchedules() {
+            const res = await fetch('/api/schedules');
+            const data = await res.json();
+            const tbody = document.getElementById('schedules-body');
+            tbody.innerHTML = '';
+
+            if(data.output) {
+                data.output.forEach(s => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td>${s.id}</td>
+                        <td><code>${s.cron}</code></td>
+                        <td><strong>${s.agent}</strong></td>
+                        <td><pre>${s.task_json}</pre></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+    </script>
+</body>
+</html>

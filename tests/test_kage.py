@@ -107,6 +107,11 @@ class TestNewAgents(unittest.TestCase):
         self.assertEqual(res["status"], "done")
         self.assertIn("workspace", res["output"])
 
+    def test_crew_agent_wake(self):
+        res = self.supervisor.wake("crew", {"action": "list_templates"})
+        self.assertEqual(res["status"], "done")
+        self.assertIsInstance(res["output"], list)
+
 
 if __name__ == "__main__":
     unittest.main()

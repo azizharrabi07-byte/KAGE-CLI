@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-kage_cli.py — User-facing CLI for KAGE OS.
+kage_cli.py — Minimalist Black & White OpenCode-Style CLI for KAGE OS.
 
 Usage:
   kage chat "message"
@@ -83,28 +83,28 @@ def cmd_chat(args):
 
     if result.get("status") == "done":
         if "response" in result:
-            print(f"\nKage: {result['response']}")
+            print(f"\n> {result['response']}")
         if "brain_response" in result:
-            print(f"\nKage: {result['brain_response']}")
+            print(f"\n> {result['brain_response']}")
         if "agent_result" in result:
             agent_result = result["agent_result"]
             if agent_result.get("status") == "done":
                 output = agent_result.get("output", {})
-                print(f"\n[Agent Output]")
+                print(f"\n[AGENT OUTPUT]")
                 if isinstance(output, (dict, list)):
                     print(json.dumps(output, indent=2, default=str))
                 else:
                     print(output)
             else:
-                print(f"\n[Agent Error]: {agent_result.get('output', 'unknown')}")
+                print(f"\n[AGENT ERROR]: {agent_result.get('output', 'unknown')}")
     else:
         print(f"Error: {result.get('output', 'unknown')}")
 
 
 def cmd_web(args):
-    """Start KAGE OS Web Landing Page & Control Dashboard."""
+    """Start KAGE OS OpenCode-Style Web Landing Page & Dashboard."""
     port = getattr(args, "port", 8080)
-    print(f"🌐 Launching KAGE OS Dashboard on http://localhost:{port} ...")
+    print(f"[OPENCODE DASHBOARD] Running on http://localhost:{port}")
     subprocess.run([PYTHON, str(KAGE_DIR / "core" / "web_ui.py"), str(port)], cwd=str(KAGE_DIR))
 
 
@@ -116,7 +116,7 @@ def cmd_agent(args):
         result = run_kage("agent", {"subcmd": "list"})
         if result.get("status") == "done":
             agents = result.get("output", [])
-            print(f"\n{'Name':<15} {'Status':<10} {'Description'}")
+            print(f"\n{'AGENT':<15} {'STATUS':<10} {'DESCRIPTION'}")
             print("─" * 70)
             for a in agents:
                 print(f"{a['name']:<15} {a['status']:<10} {a.get('description', '')}")
@@ -156,10 +156,10 @@ def cmd_trace(args):
             if not traces:
                 print("No traces recorded yet.")
                 return
-            print(f"\n{'ID':<6} {'Timestamp':<22} {'Agent':<15} {'Duration':<12} {'Status'}")
+            print(f"\n{'ID':<6} {'TIMESTAMP':<22} {'AGENT':<15} {'DURATION':<12} {'STATUS'}")
             print("─" * 75)
             for t in traces:
-                err = "✓" if not t.get("error") else "✗"
+                err = "OK" if not t.get("error") else "FAIL"
                 dur_val = t.get("duration_ms")
                 dur = f"{dur_val:.0f}ms" if dur_val is not None else "?"
                 ts = t.get("timestamp", "")[:19]
@@ -184,30 +184,30 @@ def cmd_health(args):
     result = run_kage("health")
     if result.get("status") == "done":
         output = result.get("output", {})
-        print("\n═══ KAGE PHONE HEALTH ═══")
+        print("\n┌─── SYSTEM TELEMETRY ───┐")
         if "battery" in output:
             bat = output["battery"]
             if isinstance(bat, dict):
                 if "percentage" in bat:
-                    print(f"  Battery:  {bat['percentage']}% ({bat.get('status', 'unknown')})")
+                    print(f"│ Battery:  {bat['percentage']}% ({bat.get('status', 'unknown')})")
                 elif "error" in bat:
-                    print(f"  Battery:  {bat['error']}")
+                    print(f"│ Battery:  {bat['error']}")
         if "storage" in output:
             stor = output["storage"]
             if isinstance(stor, dict) and "total" in stor:
-                print(f"  Storage:  {stor['used']} / {stor['total']} (Used: {stor.get('use_percent', '?')}, Mount: {stor.get('mount', '/')})")
+                print(f"│ Storage:  {stor['used']} / {stor['total']} ({stor.get('use_percent', '?')})")
             elif isinstance(stor, dict) and "error" in stor:
-                print(f"  Storage:  {stor['error']}")
+                print(f"│ Storage:  {stor['error']}")
         if "uptime" in output:
-            print(f"  Uptime:   {output['uptime']}")
+            print(f"│ Uptime:   {output['uptime']}")
         if "cpu" in output:
             cpu = output["cpu"]
             if isinstance(cpu, dict):
                 if "raw" in cpu:
-                    print(f"  CPU Load: {cpu['raw'][:100]}")
+                    print(f"│ CPU Load: {cpu['raw'][:80]}")
                 elif "load_average" in cpu:
-                    print(f"  CPU Load: {cpu['load_average']}")
-        print("═════════════════════════")
+                    print(f"│ CPU Load: {cpu['load_average']}")
+        print("└────────────────────────┘")
     else:
         print(f"Error: {result.get('output')}")
 
@@ -238,7 +238,7 @@ def cmd_schedule(args):
             if not jobs:
                 print("No scheduled jobs.")
                 return
-            print(f"\n{'ID':<6} {'Cron':<18} {'Agent':<15} {'Task'}")
+            print(f"\n{'ID':<6} {'CRON':<18} {'AGENT':<15} {'TASK'}")
             print("─" * 65)
             for j in jobs:
                 raw_task = j.get("task_json", "{}")
@@ -257,14 +257,14 @@ def cmd_status(args):
     result = run_kage("status")
     if result.get("status") == "done":
         output = result.get("output", {})
-        print("\n═══ KAGE SYSTEM STATUS ═══")
-        print(f"  Agents registered: {output.get('agents_registered', 0)}")
-        print(f"  Agents loaded:     {output.get('agents_loaded', 0)}")
-        print(f"  Agents awake:      {output.get('agents_awake', 0)}")
-        print(f"  Scheduled jobs:    {output.get('scheduled_jobs', 0)}")
-        print(f"  Daemon status:     {'Active (Socket)' if SOCKET_FILE.exists() else 'Standby'}")
-        print(f"  Kage Directory:    {output.get('kage_dir', '?')}")
-        print("══════════════════════════")
+        print("\n┌─── SYSTEM STATUS ───┐")
+        print(f"│ Agents Registered: {output.get('agents_registered', 0)}")
+        print(f"│ Agents Loaded:     {output.get('agents_loaded', 0)}")
+        print(f"│ Agents Awake:      {output.get('agents_awake', 0)}")
+        print(f"│ Scheduled Jobs:    {output.get('scheduled_jobs', 0)}")
+        print(f"│ Daemon Socket:     {'ONLINE' if SOCKET_FILE.exists() else 'OFFLINE'}")
+        print(f"│ Directory:         {output.get('kage_dir', '?')}")
+        print("└─────────────────────┘")
     else:
         print(f"Error: {result.get('output')}")
 
@@ -275,10 +275,10 @@ def cmd_daemon(args):
 
     if sub == "start":
         if SOCKET_FILE.exists():
-            print("[KAGE Daemon] Already running.")
+            print("[DAEMON] Already running.")
             return
 
-        print("[KAGE Daemon] Starting supervisor daemon in background...")
+        print("[DAEMON] Starting background supervisor daemon...")
         subprocess.Popen(
             [PYTHON, str(KAGE_DIR / "kage.py"), "daemon"],
             cwd=str(KAGE_DIR),
@@ -288,9 +288,9 @@ def cmd_daemon(args):
         )
         time.sleep(1)
         if SOCKET_FILE.exists():
-            print("[KAGE Daemon] Started successfully.")
+            print("[DAEMON] Started successfully.")
         else:
-            print("[KAGE Daemon] Starting... Use 'kage status' to verify.")
+            print("[DAEMON] Starting... Use 'kage status' to verify.")
 
     elif sub == "stop":
         result = run_kage("stop")
@@ -298,16 +298,16 @@ def cmd_daemon(args):
 
     elif sub == "status":
         if SOCKET_FILE.exists():
-            print("[KAGE Daemon] Active socket found at", SOCKET_FILE)
+            print("[DAEMON] Active socket at", SOCKET_FILE)
             cmd_status(args)
         else:
-            print("[KAGE Daemon] Not running. Use 'kage daemon start' to activate background service.")
+            print("[DAEMON] Not running. Use 'kage daemon start' to activate service.")
 
 
 def main():
     parser = argparse.ArgumentParser(
         prog="kage",
-        description="KAGE OS — Modular Personal AI Agent System",
+        description="KAGE OS — OpenCode-Style Personal AI Operating System",
     )
     subparsers = parser.add_subparsers(dest="command")
 
@@ -316,7 +316,7 @@ def main():
     p_chat.add_argument("message", help="Message or instruction")
 
     # web
-    p_web = subparsers.add_parser("web", help="Start KAGE OS Web Landing Page & Dashboard")
+    p_web = subparsers.add_parser("web", help="Start OpenCode-style Web Dashboard")
     p_web.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
 
     # agent

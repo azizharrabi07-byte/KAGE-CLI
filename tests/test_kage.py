@@ -1,0 +1,133 @@
+#!/usr/bin/env python3
+"""
+Unit and Integration Tests for KAGE OS.
+Run with: python3 -m unittest discover -s tests
+"""
+
+import json
+import os
+import sys
+import unittest
+from pathlib import Path
+
+# Add project root to sys.path
+PROJECT_ROOT = Path(__file__).parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from skills import helpers
+from core import brain, memory, permissions, scheduler
+import kage
+import kage_cli
+
+
+class TestSkillsHelpers(unittest.TestCase):
+    def test_format_response(self):
+        res = helpers.format_response("done", output="hello")
+        self.assertEqual(res["status"], "done")
+        self.assertEqual(res["output"], "hello")
+
+    def test_parse_json_safe(self):
+        valid = helpers.parse_json_safe('{"key": "value"}')
+        self.assertEqual(valid, {"key": "value"})
+        invalid = helpers.parse_json_safe('invalid json')
+        self.assertIsNone(invalid)
+
+    def test_truncate(self):
+        text = "a" * 300
+        truncated = helpers.truncate(text, 50)
+        self.assertEqual(len(truncated), 53)
+        self.assertTrue(truncated.endswith("..."))
+
+
+class TestCoreBrain(unittest.TestCase):
+    def test_extract_action_json(self):
+        raw = 'Here is the action:\n```json\n{"action": "system", "task": {"action": "health"}}\n```'
+        parsed = brain.extract_action_json(raw)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["action"], "system")
+
+    def test_extract_nested_action_json(self):
+        raw = 'I will run: {"action": "obsidian", "task": {"action": "read_file", "path": "test.md"}}'
+        parsed = brain.extract_action_json(raw)
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["action"], "obsidian")
+        self.assertEqual(parsed["task"]["path"], "test.md")
+
+    def test_call_llm_echo(self):
+        res = brain.call_llm([{"role": "user", "content": "hello"}])
+        self.assertEqual(res["model"], "echo")
+        self.assertIn("Received: hello", res["content"])
+
+
+class TestCoreMemory(unittest.TestCase):
+    def setUp(self):
+        memory.init_db()
+
+    def test_trace_logging(self):
+        trace_id = memory.log_trace("system", {"action": "test"}, {"status": "ok"}, duration_ms=10.5)
+        self.assertIsInstance(trace_id, int)
+        trace = memory.get_trace_by_id(trace_id)
+        self.assertIsNotNone(trace)
+        self.assertEqual(trace["agent"], "system")
+
+    def test_schedule_crud(self):
+        job_id = memory.add_schedule("0 9 * * *", "system", {"action": "health"})
+        self.assertIsInstance(job_id, int)
+        schedules = memory.get_schedules()
+        self.assertTrue(any(s["id"] == job_id for s in schedules))
+        memory.delete_schedule(job_id)
+        schedules_after = memory.get_schedules()
+        self.assertFalse(any(s["id"] == job_id for s in schedules_after))
+
+
+class TestCorePermissions(unittest.TestCase):
+    def test_safe_actions(self):
+        self.assertTrue(permissions.require_approval("system.health"))
+        self.assertTrue(permissions.require_approval("obsidian.read"))
+
+    def test_auto_approve_flag(self):
+        self.assertTrue(permissions.require_approval("whatsapp.send", auto_approve=True))
+
+
+class TestCoreScheduler(unittest.TestCase):
+    def test_cron_parsing(self):
+        cron_dict = scheduler._parse_cron("0 9 * * *")
+        self.assertEqual(cron_dict["minute"], "0")
+        self.assertEqual(cron_dict["hour"], "9")
+
+    def test_invalid_cron(self):
+        with self.assertRaises(ValueError):
+            scheduler._parse_cron("invalid cron")
+
+
+class TestKageSupervisor(unittest.TestCase):
+    def setUp(self):
+        self.supervisor = kage.Kage()
+        self.supervisor.init_context()
+
+    def tearDown(self):
+        if self.supervisor.scheduler:
+            self.supervisor.scheduler.stop()
+
+    def test_system_status(self):
+        res = self.supervisor.process_command("status", {})
+        self.assertEqual(res["status"], "done")
+        self.assertIn("agents_registered", res["output"])
+
+    def test_system_health(self):
+        res = self.supervisor.process_command("health", {})
+        self.assertEqual(res["status"], "done")
+        self.assertIn("battery", res["output"])
+
+    def test_agent_list(self):
+        res = self.supervisor.process_command("agent", {"subcmd": "list"})
+        self.assertEqual(res["status"], "done")
+        self.assertIsInstance(res["output"], list)
+
+    def test_chat_command(self):
+        res = self.supervisor.process_command("chat", {"message": "hello"})
+        self.assertEqual(res["status"], "done")
+
+
+if __name__ == "__main__":
+    unittest.main()

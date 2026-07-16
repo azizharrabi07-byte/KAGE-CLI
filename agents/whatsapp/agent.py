@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 WhatsApp Agent — Spawns Node.js Baileys bridge, sends/reads messages.
-Bridge runs on localhost:3030. Only alive during wake().
+Bridge runs as persistent background microservice on localhost:3030.
 """
 
 import gc
@@ -14,25 +14,20 @@ import time
 from pathlib import Path
 from typing import Dict
 
-# Lazy imports
-
 
 class Agent:
     def __init__(self, context):
         self.context = context
         self.alive = False
-        self.process = None
         self.bridge_url = "http://localhost:3030"
         self.bridge_dir = Path(__file__).parent / "bridge"
 
     def wake(self, task_data: dict) -> dict:
-        """Wake up: start bridge if needed, then execute."""
-        # Lazy import
+        """Wake up: start bridge if needed, then execute task."""
         global requests
         import requests as _requests
         requests = _requests
 
-        # Start bridge if not running
         self._ensure_bridge()
 
         self.alive = True
@@ -51,6 +46,8 @@ class Agent:
                 return self._read()
             elif action == "status":
                 return self._status()
+            elif action == "stop":
+                return self._stop_bridge()
             else:
                 return {"status": "error", "output": f"Unknown action: {action}"}
         except Exception as e:
@@ -62,12 +59,11 @@ class Agent:
         text = task_data.get("text", "")
 
         if not to or not text:
-            return {"status": "error", "output": "Missing 'to' or 'text'"}
+            return {"status": "error", "output": "Missing 'to' or 'text' parameter"}
 
-        # Ask permission
         approved = self.context.permissions.require_approval(
             "whatsapp.send",
-            f"Send WhatsApp to {to}: {text[:50]}..."
+            f"Send WhatsApp message to {to}: {text[:50]}..."
         )
         if not approved:
             return {"status": "denied", "output": "Send denied by user"}
@@ -75,13 +71,12 @@ class Agent:
         resp = requests.post(
             f"{self.bridge_url}/send",
             json={"to": to, "text": text},
-            timeout=10,
+            timeout=15,
         )
-        result = resp.json()
-        return {"status": "done", "output": result}
+        return {"status": "done", "output": resp.json()}
 
     def _read(self) -> dict:
-        """Read unread messages."""
+        """Read unread/buffered messages."""
         resp = requests.get(f"{self.bridge_url}/read", timeout=10)
         return {"status": "done", "output": resp.json()}
 
@@ -90,17 +85,23 @@ class Agent:
         resp = requests.get(f"{self.bridge_url}/status", timeout=5)
         return {"status": "done", "output": resp.json()}
 
+    def _stop_bridge(self) -> dict:
+        """Stop the Node.js bridge service."""
+        try:
+            requests.post(f"{self.bridge_url}/stop", timeout=2)
+            return {"status": "done", "output": "WhatsApp bridge stopped"}
+        except Exception as e:
+            return {"status": "done", "output": f"Bridge already stopped or failed to stop: {e}"}
+
     def _ensure_bridge(self):
-        """Start the Node.js bridge if not already running."""
-        # Check if bridge is alive
+        """Start the Node.js bridge in background if not running."""
         try:
             resp = requests.get(f"{self.bridge_url}/health", timeout=2)
             if resp.status_code == 200:
-                return  # Already running
+                return
         except Exception:
             pass
 
-        # Check if node_modules exist
         if not (self.bridge_dir / "node_modules").exists():
             self.log("Installing bridge dependencies...")
             subprocess.run(
@@ -110,43 +111,31 @@ class Agent:
                 timeout=120,
             )
 
-        # Start bridge
-        self.process = subprocess.Popen(
+        self.log("Starting WhatsApp bridge process...")
+        subprocess.Popen(
             ["node", "index.js"],
             cwd=str(self.bridge_dir),
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
         )
 
-        # Wait for bridge to start
         for _ in range(10):
             time.sleep(1)
             try:
                 resp = requests.get(f"{self.bridge_url}/health", timeout=2)
                 if resp.status_code == 200:
-                    self.log("Bridge started")
+                    self.log("WhatsApp bridge active")
                     return
             except Exception:
                 pass
 
-        self.log("Warning: Bridge may not have started properly")
+        self.log("Warning: Bridge process may still be starting up")
 
     def log(self, msg: str):
         print(f"[WHATSAPP] {msg}", file=sys.stderr)
 
     def sleep(self):
-        """Stop bridge and clean up."""
+        """Keep persistent bridge process running in background for persistent connection."""
         self.alive = False
-        if self.process:
-            self.process.terminate()
-            try:
-                self.process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self.process.kill()
-            self.process = None
-
-        # Unload modules
-        for mod in list(sys.modules.keys()):
-            if mod.startswith("requests"):
-                del sys.modules[mod]
         gc.collect()

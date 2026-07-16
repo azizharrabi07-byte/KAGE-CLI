@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """
 memory.py — SQLite storage for traces, workflows, and state.
-All data lives in ~/kage-os/kage.db
+All data lives in ~/kage-os/kage.db or relative to root.
 """
 
 import json
 import sqlite3
 import time
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 
@@ -17,7 +17,8 @@ DB_PATH = Path(__file__).parent.parent / "kage.db"
 
 def _get_conn() -> sqlite3.Connection:
     """Get a connection to the database, creating tables if needed."""
-    conn = sqlite3.connect(str(DB_PATH))
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH), timeout=10.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
@@ -58,33 +59,68 @@ def _get_conn() -> sqlite3.Connection:
 def log_trace(agent: str, task: dict, output: dict = None, error: str = None, duration_ms: float = 0) -> int:
     """Log a trace entry. Returns the trace ID."""
     conn = _get_conn()
-    cursor = conn.execute(
-        "INSERT INTO traces (timestamp, agent, task_json, output_json, error, duration_ms) VALUES (?, ?, ?, ?, ?, ?)",
-        (datetime.now().isoformat(), agent, json.dumps(task),
-         json.dumps(output) if output else None, error, duration_ms)
-    )
-    trace_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return trace_id
+    try:
+        cursor = conn.execute(
+            "INSERT INTO traces (timestamp, agent, task_json, output_json, error, duration_ms) VALUES (?, ?, ?, ?, ?, ?)",
+            (
+                datetime.now().isoformat(),
+                agent,
+                json.dumps(task, default=str),
+                json.dumps(output, default=str) if output is not None else None,
+                error,
+                duration_ms
+            )
+        )
+        trace_id = cursor.lastrowid
+        conn.commit()
+        return trace_id
+    finally:
+        conn.close()
 
 
 def get_recent_traces(limit: int = 20) -> List[Dict]:
     """Get the last N traces."""
     conn = _get_conn()
-    rows = conn.execute(
-        "SELECT * FROM traces ORDER BY id DESC LIMIT ?", (limit,)
-    ).fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute(
+            "SELECT * FROM traces ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["task"] = json.loads(d["task_json"]) if d.get("task_json") else {}
+            except Exception:
+                d["task"] = d.get("task_json")
+            try:
+                d["output"] = json.loads(d["output_json"]) if d.get("output_json") else None
+            except Exception:
+                d["output"] = d.get("output_json")
+            result.append(d)
+        return result
+    finally:
+        conn.close()
 
 
 def get_trace_by_id(trace_id: int) -> Optional[Dict]:
     """Get a specific trace."""
     conn = _get_conn()
-    row = conn.execute("SELECT * FROM traces WHERE id = ?", (trace_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    try:
+        row = conn.execute("SELECT * FROM traces WHERE id = ?", (trace_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        try:
+            d["task"] = json.loads(d["task_json"]) if d.get("task_json") else {}
+        except Exception:
+            d["task"] = d.get("task_json")
+        try:
+            d["output"] = json.loads(d["output_json"]) if d.get("output_json") else None
+        except Exception:
+            d["output"] = d.get("output_json")
+        return d
+    finally:
+        conn.close()
 
 
 # --- Workflow persistence ---
@@ -92,38 +128,46 @@ def get_trace_by_id(trace_id: int) -> Optional[Dict]:
 def create_workflow(name: str, steps: list) -> int:
     """Create a workflow. Returns workflow ID."""
     conn = _get_conn()
-    cursor = conn.execute(
-        "INSERT INTO workflows (name, steps_json, status, created_at) VALUES (?, ?, ?, ?)",
-        (name, json.dumps(steps), "pending", datetime.now().isoformat())
-    )
-    wf_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return wf_id
+    try:
+        cursor = conn.execute(
+            "INSERT INTO workflows (name, steps_json, status, created_at) VALUES (?, ?, ?, ?)",
+            (name, json.dumps(steps, default=str), "pending", datetime.now().isoformat())
+        )
+        wf_id = cursor.lastrowid
+        conn.commit()
+        return wf_id
+    finally:
+        conn.close()
 
 
 def update_workflow_status(wf_id: int, status: str):
     """Update workflow status."""
     conn = _get_conn()
-    conn.execute("UPDATE workflows SET status = ? WHERE id = ?", (status, wf_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("UPDATE workflows SET status = ? WHERE id = ?", (status, wf_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def get_workflow(wf_id: int) -> Optional[Dict]:
     """Get a workflow."""
     conn = _get_conn()
-    row = conn.execute("SELECT * FROM workflows WHERE id = ?", (wf_id,)).fetchone()
-    conn.close()
-    return dict(row) if row else None
+    try:
+        row = conn.execute("SELECT * FROM workflows WHERE id = ?", (wf_id,)).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
 
 
 def get_pending_workflows() -> List[Dict]:
     """Get workflows that need to run."""
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM workflows WHERE status IN ('pending', 'running')").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute("SELECT * FROM workflows WHERE status IN ('pending', 'running')").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 # --- Schedule ---
@@ -131,46 +175,51 @@ def get_pending_workflows() -> List[Dict]:
 def add_schedule(cron: str, agent: str, task: dict) -> int:
     """Add a scheduled job. Returns job ID."""
     conn = _get_conn()
-    cursor = conn.execute(
-        "INSERT INTO schedule (cron, agent, task_json, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
-        (cron, agent, json.dumps(task), datetime.now().isoformat())
-    )
-    job_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    return job_id
+    try:
+        cursor = conn.execute(
+            "INSERT INTO schedule (cron, agent, task_json, enabled, created_at) VALUES (?, ?, ?, 1, ?)",
+            (cron, agent, json.dumps(task, default=str), datetime.now().isoformat())
+        )
+        job_id = cursor.lastrowid
+        conn.commit()
+        return job_id
+    finally:
+        conn.close()
 
 
 def get_schedules() -> List[Dict]:
     """Get all scheduled jobs."""
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM schedule WHERE enabled = 1").fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
+    try:
+        rows = conn.execute("SELECT * FROM schedule WHERE enabled = 1").fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
 
 
 def update_schedule_run(job_id: int):
     """Mark schedule as last run."""
     conn = _get_conn()
-    conn.execute("UPDATE schedule SET last_run = ? WHERE id = ?", (datetime.now().isoformat(), job_id))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("UPDATE schedule SET last_run = ? WHERE id = ?", (datetime.now().isoformat(), job_id))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def delete_schedule(job_id: int):
     """Delete a scheduled job."""
     conn = _get_conn()
-    conn.execute("DELETE FROM schedule WHERE id = ?", (job_id,))
-    conn.commit()
-    conn.close()
+    try:
+        conn.execute("DELETE FROM schedule WHERE id = ?", (job_id,))
+        conn.commit()
+    finally:
+        conn.close()
 
-
-# --- Helper ---
 
 def init_db():
     """Initialize the database."""
-    _get_conn()
-    # Don't print — called from daemon too
+    _get_conn().close()
 
 
 if __name__ == "__main__":

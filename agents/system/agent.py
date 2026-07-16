@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-System Agent — Battery, storage, CPU via termux-api.
+System Agent — Battery, storage, CPU via termux-api and Linux standard interfaces.
 """
 
 import gc
@@ -8,16 +8,17 @@ import json
 import os
 import sys
 import subprocess
+from pathlib import Path
 from typing import Dict
 
 
 class Agent:
     def __init__(self, context):
-        self.context = context  # has brain, memory, permissions
+        self.context = context
         self.alive = False
 
     def wake(self, task_data: dict) -> dict:
-        """Wake up and execute. Heavy imports happen here."""
+        """Wake up and execute."""
         self.alive = True
         try:
             return self.execute(task_data)
@@ -29,65 +30,94 @@ class Agent:
         result = {}
 
         # Battery
+        result["battery"] = self._get_battery()
+
+        # Storage
+        result["storage"] = self._get_storage()
+
+        # CPU
+        result["cpu"] = self._get_cpu()
+
+        # Uptime
+        result["uptime"] = self._get_uptime()
+
+        return {"status": "done", "output": result}
+
+    def _get_battery(self) -> dict:
         try:
             out = subprocess.run(
                 ["termux-battery-status"], capture_output=True, text=True, timeout=5
             )
-            if out.returncode == 0:
-                result["battery"] = json.loads(out.stdout)
-            else:
-                result["battery"] = {"error": out.stderr.strip()}
-        except FileNotFoundError:
-            result["battery"] = {"status": "termux-api not installed", "percentage": 100}
-        except Exception as e:
-            result["battery"] = {"error": str(e)}
+            if out.returncode == 0 and out.stdout.strip():
+                return json.loads(out.stdout)
+        except Exception:
+            pass
 
-        # Storage
+        # Fallback to sysfs (standard Linux/Android)
         try:
-            out = subprocess.run(
-                ["df", "-h", "/data"], capture_output=True, text=True, timeout=5
-            )
-            if out.returncode == 0:
-                lines = out.stdout.strip().split("\n")
-                if len(lines) >= 2:
-                    parts = lines[1].split()
-                    result["storage"] = {
-                        "total": parts[1],
-                        "used": parts[2],
-                        "available": parts[3],
-                        "use_percent": parts[4],
-                    }
-            else:
-                result["storage"] = {"error": out.stderr.strip()}
-        except Exception as e:
-            result["storage"] = {"error": str(e)}
+            capacity_file = Path("/sys/class/power_supply/battery/capacity")
+            status_file = Path("/sys/class/power_supply/battery/status")
+            if capacity_file.exists():
+                percentage = int(capacity_file.read_text().strip())
+                status = status_file.read_text().strip() if status_file.exists() else "UNKNOWN"
+                return {"percentage": percentage, "status": status, "source": "sysfs"}
+        except Exception:
+            pass
 
-        # CPU
+        return {"status": "termux-api not installed", "percentage": 100}
+
+    def _get_storage(self) -> dict:
+        for path in ["/data", "/sdcard", "/"]:
+            try:
+                out = subprocess.run(
+                    ["df", "-h", path], capture_output=True, text=True, timeout=5
+                )
+                if out.returncode == 0:
+                    lines = out.stdout.strip().split("\n")
+                    if len(lines) >= 2:
+                        parts = lines[1].split()
+                        if len(parts) >= 5:
+                            return {
+                                "mount": path,
+                                "total": parts[1],
+                                "used": parts[2],
+                                "available": parts[3],
+                                "use_percent": parts[4],
+                            }
+            except Exception:
+                continue
+        return {"error": "Could not query storage information"}
+
+    def _get_cpu(self) -> dict:
         try:
             out = subprocess.run(
                 ["top", "-n", "1", "-b"], capture_output=True, text=True, timeout=5
             )
             if out.returncode == 0:
-                # Parse first few lines for CPU usage
                 lines = out.stdout.strip().split("\n")
-                cpu_line = next((l for l in lines if "Cpu" in l or "cpu" in l.lower()), "")
-                result["cpu"] = {"raw": cpu_line[:200]}
-        except Exception as e:
-            result["cpu"] = {"error": str(e)}
+                cpu_line = next((l for l in lines if "cpu" in l.lower()), "")
+                if cpu_line:
+                    return {"raw": cpu_line[:200]}
+        except Exception:
+            pass
 
-        # Uptime
         try:
-            with open("/proc/uptime") as f:
+            with open("/proc/loadavg", "r") as f:
+                loadavg = f.read().strip()
+                return {"load_average": loadavg}
+        except Exception as e:
+            return {"error": str(e)}
+
+    def _get_uptime(self) -> str:
+        try:
+            with open("/proc/uptime", "r") as f:
                 uptime_secs = float(f.read().split()[0])
                 hours = int(uptime_secs // 3600)
                 minutes = int((uptime_secs % 3600) // 60)
-                result["uptime"] = f"{hours}h {minutes}m"
+                return f"{hours}h {minutes}m"
         except Exception:
-            result["uptime"] = "unknown"
-
-        return {"status": "done", "output": result}
+            return "unknown"
 
     def sleep(self):
-        """Clean up — no resources to release."""
         self.alive = False
         gc.collect()

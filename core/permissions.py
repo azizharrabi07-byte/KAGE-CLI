@@ -10,13 +10,15 @@ from typing import Dict
 # Actions that are safe (auto-approve)
 SAFE_ACTIONS = {
     "system.health", "system.read", "memory.read", "memory.write",
-    "obsidian.read", "obsidian.search", "trace.list",
+    "obsidian.read", "obsidian.list_files", "obsidian.search",
+    "whatsapp.status", "whatsapp.read",
+    "trace.list", "trace.show", "schedule.list", "status",
 }
 
 # Actions that need approval
 SENSITIVE_ACTIONS = {
-    "whatsapp.send", "obsidian.write", "obsidian.delete",
-    "meta.upgrade", "system.delete", "system.install",
+    "whatsapp.send", "obsidian.write", "obsidian.delete", "obsidian.append",
+    "meta.upgrade", "meta.pull", "system.delete", "system.install",
 }
 
 
@@ -35,11 +37,15 @@ def require_approval(action: str, description: str = "", auto_approve: bool = Fa
         return True
 
     # Auto-approve safe actions
-    action_prefix = action.split(".")[0] + "." + action.split(".")[1] if "." in action else action
-    if action_prefix in SAFE_ACTIONS or action in SAFE_ACTIONS:
+    if action in SAFE_ACTIONS:
         return True
 
-    # Skip prompt if stdin is not a terminal (piped input)
+    # Check prefix match for custom actions
+    action_prefix = action.split(".")[0] + ".*"
+    if action_prefix in SAFE_ACTIONS:
+        return True
+
+    # Skip prompt if stdin is not a terminal (piped input/daemon mode)
     if not sys.stdin.isatty():
         return True
 

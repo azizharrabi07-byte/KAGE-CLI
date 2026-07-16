@@ -29,7 +29,7 @@ class Agent:
     def execute(self, task_data: dict) -> dict:
         action = task_data.get("action", "check")
 
-        if action == "pull":
+        if action == "pull" or action == "upgrade":
             return self._do_pull()
         elif action == "check":
             return self._check_status()
@@ -39,7 +39,7 @@ class Agent:
             return {"status": "error", "output": f"Unknown action: {action}"}
 
     def _check_status(self) -> dict:
-        """Check if there are updates available."""
+        """Check if updates are available."""
         try:
             result = subprocess.run(
                 ["git", "-C", str(self.kage_dir), "status", "--porcelain"],
@@ -47,10 +47,9 @@ class Agent:
             )
             has_changes = bool(result.stdout.strip())
 
-            # Check remote
-            fetch = subprocess.run(
+            subprocess.run(
                 ["git", "-C", str(self.kage_dir), "fetch", "origin"],
-                capture_output=True, text=True, timeout=10
+                capture_output=True, text=True, timeout=15
             )
             status = subprocess.run(
                 ["git", "-C", str(self.kage_dir), "status", "-sb"],
@@ -72,15 +71,14 @@ class Agent:
     def _do_pull(self) -> dict:
         """Pull latest changes. Requires permission."""
         try:
-            # Ask permission
             approved = self.context.permissions.require_approval(
                 "meta.upgrade",
-                "Upgrade KAGE to latest version from git?"
+                "Upgrade KAGE to latest version from git repository?"
             )
             if not approved:
                 return {"status": "denied", "output": "Upgrade denied by user"}
 
-            # Stash local changes
+            # Stash local changes if any
             subprocess.run(
                 ["git", "-C", str(self.kage_dir), "stash"],
                 capture_output=True, text=True, timeout=10
@@ -93,40 +91,47 @@ class Agent:
             )
 
             if result.returncode != 0:
+                # Retry without branch specification if main doesn't exist
+                result = subprocess.run(
+                    ["git", "-C", str(self.kage_dir), "pull"],
+                    capture_output=True, text=True, timeout=30
+                )
+
+            if result.returncode != 0:
                 return {"status": "error", "output": f"git pull failed: {result.stderr}"}
 
             # Run tests if available
             tests_dir = self.kage_dir / "tests"
+            tests_passed = True
+            test_output = ""
             if tests_dir.exists():
                 test_result = subprocess.run(
-                    [sys.executable, "-m", "pytest", str(tests_dir), "-q"],
+                    [sys.executable, "-m", "unittest", "discover", "-s", str(tests_dir)],
                     capture_output=True, text=True, timeout=60
                 )
+                test_output = test_result.stdout + test_result.stderr
                 if test_result.returncode != 0:
-                    return {
-                        "status": "error",
-                        "output": f"Tests failed after upgrade:\n{test_result.stdout}\n{test_result.stderr}"
-                    }
+                    tests_passed = False
 
             return {
                 "status": "done",
                 "output": {
                     "pulled": True,
                     "message": result.stdout.strip()[:200],
-                    "tests_passed": True,
+                    "tests_passed": tests_passed,
+                    "test_log": test_output[:300],
                 },
             }
         except Exception as e:
             return {"status": "error", "output": str(e)}
 
     def _restart(self) -> dict:
-        """Restart the kage supervisor."""
+        """Signal supervisor restart."""
         try:
-            # Touch the lock file to signal restart
             lock_file = self.kage_dir / ".kage.lock"
             if lock_file.exists():
                 lock_file.unlink()
-            return {"status": "done", "output": "Restart signal sent"}
+            return {"status": "done", "output": "Restart signal sent. Daemon will restart on next check."}
         except Exception as e:
             return {"status": "error", "output": str(e)}
 

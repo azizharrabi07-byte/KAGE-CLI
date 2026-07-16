@@ -16,46 +16,84 @@ app.use(express.json());
 
 const PORT = 3030;
 const AUTH_DIR = path.join(__dirname, 'auth_info');
+if (!fs.existsSync(AUTH_DIR)) {
+    fs.mkdirSync(AUTH_DIR, { recursive: true });
+}
+
 const logger = pino({ level: 'silent' });
 
 let sock = null;
 let connectionStatus = 'disconnected';
+const messageBuffer = [];
+const MAX_MESSAGES = 100;
+
+function formatJid(target) {
+    if (!target) return target;
+    if (target.includes('@s.whatsapp.net') || target.includes('@g.us')) {
+        return target;
+    }
+    const cleanNum = target.replace(/[^0-9]/g, '');
+    return `${cleanNum}@s.whatsapp.net`;
+}
 
 // --- WhatsApp Connection ---
 
 async function connectWA() {
-    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
-    
-    const { version } = await fetchLatestBaileysVersion();
-    
-    sock = makeWASocket({
-        version,
-        auth: state,
-        printQRInTerminal: true,
-        logger,
-        browser: ['KAGE OS', 'Safari', '3.0'],
-    });
-
-    sock.ev.on('creds.update', saveCreds);
-
-    sock.ev.on('connection.update', (update) => {
-        const { connection, lastDisconnect } = update;
+    try {
+        const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+        const { version } = await fetchLatestBaileysVersion();
         
-        if (connection === 'close') {
-            const reason = lastDisconnect?.error?.output?.statusCode;
-            connectionStatus = 'disconnected';
-            
-            if (reason !== DisconnectReason.loggedOut) {
-                // Reconnect after 5 seconds
-                setTimeout(connectWA, 5000);
-            } else {
-                console.log('[BRIDGE] Logged out. Delete auth_info/ and restart to re-auth.');
+        sock = makeWASocket({
+            version,
+            auth: state,
+            printQRInTerminal: true,
+            logger,
+            browser: ['KAGE OS', 'Safari', '3.0'],
+        });
+
+        sock.ev.on('creds.update', saveCreds);
+
+        sock.ev.on('messages.upsert', (m) => {
+            if (m.type === 'notify' || m.type === 'append') {
+                for (const msg of m.messages) {
+                    if (!msg.key.fromMe) {
+                        messageBuffer.push({
+                            id: msg.key.id,
+                            from: msg.key.remoteJid,
+                            senderName: msg.pushName || 'Unknown',
+                            timestamp: msg.messageTimestamp,
+                            text: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '',
+                        });
+                        if (messageBuffer.length > MAX_MESSAGES) {
+                            messageBuffer.shift();
+                        }
+                    }
+                }
             }
-        } else if (connection === 'open') {
-            connectionStatus = 'connected';
-            console.log('[BRIDGE] WhatsApp connected!');
-        }
-    });
+        });
+
+        sock.ev.on('connection.update', (update) => {
+            const { connection, lastDisconnect } = update;
+            
+            if (connection === 'close') {
+                const reason = lastDisconnect?.error?.output?.statusCode;
+                connectionStatus = 'disconnected';
+                
+                if (reason !== DisconnectReason.loggedOut) {
+                    setTimeout(connectWA, 5000);
+                } else {
+                    console.log('[BRIDGE] Logged out. Delete auth_info/ and restart to re-auth.');
+                }
+            } else if (connection === 'open') {
+                connectionStatus = 'connected';
+                console.log('[BRIDGE] WhatsApp connected!');
+            }
+        });
+    } catch (err) {
+        console.error('[BRIDGE] Connection error:', err.message);
+        connectionStatus = 'error';
+        setTimeout(connectWA, 10000);
+    }
 }
 
 // --- API Routes ---
@@ -63,30 +101,27 @@ async function connectWA() {
 // Send a message
 app.post('/send', async (req, res) => {
     if (connectionStatus !== 'connected') {
-        return res.json({ error: 'WhatsApp not connected', status: connectionStatus });
+        return res.status(400).json({ error: 'WhatsApp not connected', status: connectionStatus });
     }
     
     const { to, text } = req.body;
     if (!to || !text) {
-        return res.json({ error: 'Missing "to" or "text" in body' });
+        return res.status(400).json({ error: 'Missing "to" or "text" in body' });
     }
     
     try {
-        const result = await sock.sendMessage(to, { text });
-        res.json({ status: 'sent', key: result.key });
+        const jid = formatJid(to);
+        const result = await sock.sendMessage(jid, { text });
+        res.json({ status: 'sent', jid, key: result.key });
     } catch (e) {
-        res.json({ error: e.message });
+        res.status(500).json({ error: e.message });
     }
 });
 
-// Read unread messages
+// Read unread/recent messages
 app.get('/read', async (req, res) => {
-    if (connectionStatus !== 'connected') {
-        return res.json({ error: 'WhatsApp not connected', status: connectionStatus, messages: [] });
-    }
-    
-    // Return empty for now — full implementation would store messages
-    res.json({ messages: [], count: 0 });
+    const unread = messageBuffer.splice(0, messageBuffer.length);
+    res.json({ count: unread.length, messages: unread, whatsapp: connectionStatus });
 });
 
 // Connection status
@@ -94,12 +129,19 @@ app.get('/status', (req, res) => {
     res.json({
         status: connectionStatus,
         user: sock?.user || null,
+        buffered_messages: messageBuffer.length,
     });
 });
 
 // Health check
 app.get('/health', (req, res) => {
     res.json({ status: 'ok', whatsapp: connectionStatus });
+});
+
+// Stop bridge
+app.post('/stop', (req, res) => {
+    res.json({ status: 'stopping' });
+    process.exit(0);
 });
 
 // --- Start ---

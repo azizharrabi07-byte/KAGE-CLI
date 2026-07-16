@@ -13,39 +13,42 @@ from typing import Dict, List, Optional, Tuple, Any
 
 
 def _load_config() -> Dict:
-    """Load config.toml — lazy import toml or fallback parser."""
+    """Load config.toml — user config (~/.kage/config.toml) overrides repo config."""
     config_paths = [
         Path(__file__).parent.parent / "config.toml",
         Path.home() / ".kage" / "config.toml",
     ]
 
-    config_path = None
+    merged_config = {}
     for p in config_paths:
-        if p.exists():
-            config_path = p
-            break
+        if not p.exists():
+            continue
+        try:
+            import toml
+            data = toml.load(p)
+        except ImportError:
+            data = {}
+            current_section = None
+            with open(p, "r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#"):
+                        continue
+                    if line.startswith("[") and line.endswith("]"):
+                        current_section = line[1:-1]
+                        if current_section not in data:
+                            data[current_section] = {}
+                    elif "=" in line and current_section:
+                        key, _, val = line.partition("=")
+                        data[current_section][key.strip()] = val.strip().strip('"\'')
 
-    if not config_path:
-        return {}
+        for sec, items in data.items():
+            if sec not in merged_config:
+                merged_config[sec] = {}
+            if isinstance(items, dict):
+                merged_config[sec].update(items)
 
-    try:
-        import toml
-        return toml.load(config_path)
-    except ImportError:
-        config = {}
-        current_section = None
-        with open(config_path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#"):
-                    continue
-                if line.startswith("[") and line.endswith("]"):
-                    current_section = line[1:-1]
-                    config[current_section] = {}
-                elif "=" in line and current_section:
-                    key, _, val = line.partition("=")
-                    config[current_section][key.strip()] = val.strip().strip('"\'')
-        return config
+    return merged_config
 
 
 def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
@@ -107,11 +110,11 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
     model = os.environ.get("LLM_MODEL") or llm_config.get("model", "gemini-2.5-flash")
     base_url = os.environ.get("LLM_BASE_URL") or llm_config.get("base_url", "https://openrouter.ai/api/v1")
 
-    if not api_key or api_key == "YOUR_KEY_HERE":
+    if not api_key or api_key in ("YOUR_KEY_HERE", "YOUR_GEMINI_API_KEY_HERE"):
         last_msg = messages[-1]["content"] if messages else "no input"
         return {
             "role": "assistant",
-            "content": f"[ECHO MODE — no API key configured] Received: {last_msg}",
+            "content": f"[ECHO MODE — no valid API key configured] Received: {last_msg}",
             "model": "echo",
         }
 
@@ -147,7 +150,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
                 json=payload,
                 timeout=60,
             )
-            
+
             if resp.status_code != 200:
                 err_data = resp.json() if resp.headers.get("content-type") == "application/json" else {}
                 err_msg = err_data.get("error", {}).get("message", resp.text)

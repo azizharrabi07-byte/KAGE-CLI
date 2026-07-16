@@ -9,6 +9,21 @@
         "timeout": 15,
         "description": "Read/write notes via Trilium / TriliumDroid ETapi"
     },
+    "mcp": {
+        "path": "mcp",
+        "timeout": 30,
+        "description": "Model Context Protocol Client for remote/local tool servers (Awesome MCP)"
+    },
+    "browser": {
+        "path": "browser",
+        "timeout": 30,
+        "description": "Autonomous web search, page fetching, and article extraction (browser-use)"
+    },
+    "openhands": {
+        "path": "openhands",
+        "timeout": 30,
+        "description": "Sandbox workspace execution, code editing, and system control (OpenHands)"
+    },
     "meta": {
         "path": "meta",
         "timeout": 60,

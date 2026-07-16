@@ -8,6 +8,12 @@ base_url = "https://generativelanguage.googleapis.com/v1beta"
 url = "http://localhost:8080"
 etapi_token = "YOUR_TRILIUM_ETAPI_TOKEN"
 
+[mcp]
+servers = [
+    { name = "fetch", url = "http://localhost:8000/mcp" },
+    { name = "filesystem", url = "http://localhost:8001/mcp" }
+]
+
 [system]
 log_level = "info"
 max_retries = 3

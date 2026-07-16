@@ -11,6 +11,9 @@ from typing import Dict
 SAFE_ACTIONS = {
     "system.health", "system.read", "memory.read", "memory.write",
     "trilium.read", "trilium.list_notes", "trilium.search",
+    "browser.search", "browser.fetch", "browser.read", "browser.extract_links",
+    "mcp.list_servers", "mcp.list_tools", "mcp.list_resources", "mcp.read_resource",
+    "openhands.status",
     "whatsapp.status", "whatsapp.read",
     "trace.list", "trace.show", "schedule.list", "status",
 }
@@ -18,6 +21,7 @@ SAFE_ACTIONS = {
 # Actions that need approval
 SENSITIVE_ACTIONS = {
     "whatsapp.send", "trilium.write_note", "trilium.append_note", "trilium.delete",
+    "mcp.call_tool", "openhands.execute_cmd", "openhands.run_python", "openhands.write_code",
     "meta.upgrade", "meta.pull", "system.delete", "system.install",
 }
 

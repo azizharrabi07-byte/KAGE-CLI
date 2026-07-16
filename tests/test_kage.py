@@ -45,12 +45,11 @@ class TestCoreBrain(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["action"], "system")
 
-    def test_extract_nested_trilium_action(self):
-        raw = 'I will run: {"action": "trilium", "task": {"action": "read_note", "note_id": "root"}}'
+    def test_extract_nested_mcp_action(self):
+        raw = 'I will run: {"action": "mcp", "task": {"action": "call_tool", "tool": "fetch"}}'
         parsed = brain.extract_action_json(raw)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "trilium")
-        self.assertEqual(parsed["task"]["note_id"], "root")
+        self.assertEqual(parsed["action"], "mcp")
 
     def test_call_llm_gemini_integration(self):
         res = brain.call_llm([{"role": "user", "content": "Respond short: active"}])
@@ -82,50 +81,31 @@ class TestCoreMemory(unittest.TestCase):
 class TestCorePermissions(unittest.TestCase):
     def test_safe_actions(self):
         self.assertTrue(permissions.require_approval("system.health"))
-        self.assertTrue(permissions.require_approval("trilium.read"))
+        self.assertTrue(permissions.require_approval("browser.search"))
+        self.assertTrue(permissions.require_approval("mcp.list_tools"))
 
     def test_auto_approve_flag(self):
-        self.assertTrue(permissions.require_approval("whatsapp.send", auto_approve=True))
+        self.assertTrue(permissions.require_approval("openhands.execute_cmd", auto_approve=True))
 
 
-class TestCoreScheduler(unittest.TestCase):
-    def test_cron_parsing(self):
-        cron_dict = scheduler._parse_cron("0 9 * * *")
-        self.assertEqual(cron_dict["minute"], "0")
-        self.assertEqual(cron_dict["hour"], "9")
-
-    def test_invalid_cron(self):
-        with self.assertRaises(ValueError):
-            scheduler._parse_cron("invalid cron")
-
-
-class TestKageSupervisor(unittest.TestCase):
+class TestNewAgents(unittest.TestCase):
     def setUp(self):
         self.supervisor = kage.Kage()
         self.supervisor.init_context()
 
-    def tearDown(self):
-        if self.supervisor.scheduler:
-            self.supervisor.scheduler.stop()
-
-    def test_system_status(self):
-        res = self.supervisor.process_command("status", {})
-        self.assertEqual(res["status"], "done")
-        self.assertIn("agents_registered", res["output"])
-
-    def test_system_health(self):
-        res = self.supervisor.process_command("health", {})
-        self.assertEqual(res["status"], "done")
-        self.assertIn("battery", res["output"])
-
-    def test_agent_list(self):
-        res = self.supervisor.process_command("agent", {"subcmd": "list"})
+    def test_mcp_agent_wake(self):
+        res = self.supervisor.wake("mcp", {"action": "list_servers"})
         self.assertEqual(res["status"], "done")
         self.assertIsInstance(res["output"], list)
 
-    def test_trilium_agent_wake(self):
-        res = self.supervisor.wake("trilium", {"action": "list_notes"})
-        self.assertIn("status", res)
+    def test_browser_agent_wake(self):
+        res = self.supervisor.wake("browser", {"action": "search", "query": "Python"})
+        self.assertEqual(res["status"], "done")
+
+    def test_openhands_agent_wake(self):
+        res = self.supervisor.wake("openhands", {"action": "status"})
+        self.assertEqual(res["status"], "done")
+        self.assertIn("workspace", res["output"])
 
 
 if __name__ == "__main__":

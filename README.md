@@ -1,17 +1,20 @@
 # KAGE OS — Personal AI Agent System
 
-A modular, high-performance CLI-based AI operating system for your phone (Termux/Android), Linux, and macOS. Powered natively by Google Gemini 2.5 Flash and connected to phone health, WhatsApp, and Trilium / TriliumDroid notes.
+A modular, high-performance CLI-based AI operating system for your phone (Termux/Android), Linux, and macOS. Powered natively by Google Gemini 2.5 Flash and connected to phone health, WhatsApp, Trilium / TriliumDroid notes, Model Context Protocol (MCP) servers, autonomous web browsing, and software control sandboxes.
 
-## Architecture
+## Architecture & Agents
 
 - **`core/`**
-  - `brain.py`: LLM wrapper natively supporting **Google Gemini API** (`gemini-2.5-flash`) and OpenRouter/OpenAI compatible models with action extraction.
+  - `brain.py`: LLM wrapper natively supporting **Google Gemini API** (`gemini-2.5-flash`) and OpenRouter/OpenAI compatible models with automated JSON action block extraction.
   - `memory.py`: SQLite WAL database for trace logging, workflows, and cron schedule persistence (`kage.db`).
   - `permissions.py`: Safety permission model distinguishing read/health checks from sensitive actions.
   - `scheduler.py`: Background cron-style task scheduler with minute-level execution tracking.
 - **`agents/`**
   - `whatsapp`: Baileys microservice bridge (`localhost:3030`) with persistent background process and JID auto-formatting.
   - `trilium`: [TriliumDroid](https://github.com/FliegendeWurst/TriliumDroid) / Trilium Notes ETapi integration for mobile hierarchical note management.
+  - `mcp`: [Awesome MCP](https://github.com/punkpeye/awesome-mcp-servers) client bridge connecting Kage to remote and local Model Context Protocol tool & resource servers (JSON-RPC 2.0).
+  - `browser`: [browser-use](https://github.com/browser-use/browser-use) inspired web browsing agent for live web searches, article fetching, HTML link parsing, and content extraction.
+  - `openhands`: [OpenHands](https://github.com/OpenHands/OpenHands) inspired software execution & control agent for sandboxed terminal command execution, python evaluation, and file writing.
   - `system`: Cross-platform phone health inspection (battery, storage, CPU load, uptime).
   - `meta`: Self-upgrade agent for automated `git pull`, automated testing, and daemon reload.
 - **`skills/`**
@@ -44,10 +47,13 @@ kage health            # Check phone battery, storage, CPU load, and uptime
 kage chat "hello"      # Direct interaction with Kage AI brain (Gemini 2.5)
 ```
 
-### 3. Agent Operations
+### 3. Agent Capabilities
 ```bash
-kage agent list        # List all registered agents and status
-kage agent wake system --task '{"action":"health"}'
+kage agent list        # List all 8 registered agents and status
+kage chat "Search the web for OpenHands AI agent framework"
+kage agent wake browser --task '{"action":"search", "query":"Model Context Protocol"}'
+kage agent wake mcp --task '{"action":"list_servers"}'
+kage agent wake openhands --task '{"action":"status"}'
 kage agent wake trilium --task '{"action":"list_notes"}'
 kage agent create mybot # Scaffold a new agent directory
 ```
@@ -85,6 +91,12 @@ base_url = "https://generativelanguage.googleapis.com/v1beta"
 [trilium]
 url = "http://localhost:8080"
 etapi_token = "YOUR_TRILIUM_ETAPI_TOKEN"
+
+[mcp]
+servers = [
+    { name = "fetch", url = "http://localhost:8000/mcp" },
+    { name = "filesystem", url = "http://localhost:8001/mcp" }
+]
 
 [system]
 log_level = "info"

@@ -1,0 +1,27 @@
+{
+    "whatsapp": {
+        "path": "whatsapp",
+        "timeout": 30,
+        "description": "Send and read WhatsApp messages via Baileys"
+    },
+    "obsidian": {
+        "path": "obsidian",
+        "timeout": 15,
+        "description": "Read/write notes via Obsidian REST API"
+    },
+    "meta": {
+        "path": "meta",
+        "timeout": 60,
+        "description": "Self-upgrade via git pull"
+    },
+    "system": {
+        "path": "system",
+        "timeout": 10,
+        "description": "Phone health \u2014 battery, storage, CPU"
+    },
+    "tester": {
+        "path": "tester",
+        "timeout": 30,
+        "description": "Custom agent: tester"
+    }
+}

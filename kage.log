@@ -1,0 +1,103 @@
+[2026-07-16 16:57:06] [INFO] Context initialized
+[2026-07-16 16:57:06] [INFO] KAGE supervisor started
+[2026-07-16 16:57:06] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:08] [INFO] Context initialized
+[2026-07-16 16:57:08] [INFO] KAGE supervisor started
+[2026-07-16 16:57:08] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:09] [INFO] Context initialized
+[2026-07-16 16:57:09] [INFO] KAGE supervisor started
+[2026-07-16 16:57:09] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:11] [INFO] Context initialized
+[2026-07-16 16:57:11] [INFO] KAGE supervisor started
+[2026-07-16 16:57:11] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:12] [INFO] Context initialized
+[2026-07-16 16:57:12] [INFO] KAGE supervisor started
+[2026-07-16 16:57:13] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:14] [INFO] Context initialized
+[2026-07-16 16:57:14] [INFO] KAGE supervisor started
+[2026-07-16 16:57:14] [INFO] KAGE supervisor stopped
+[2026-07-16 16:57:18] [INFO] Context initialized
+[2026-07-16 16:57:18] [INFO] KAGE supervisor started
+[2026-07-16 16:57:18] [INFO] KAGE supervisor stopped
+[2026-07-16 16:58:30] [INFO] Context initialized
+[2026-07-16 16:58:30] [INFO] KAGE supervisor started
+[2026-07-16 16:58:30] [INFO] KAGE supervisor stopped
+[2026-07-16 17:00:55] [INFO] Context initialized
+[2026-07-16 17:00:55] [INFO] KAGE supervisor started
+[2026-07-16 17:00:55] [INFO] KAGE supervisor stopped
+[2026-07-16 17:02:02] [INFO] Context initialized
+[2026-07-16 17:02:52] [INFO] Context initialized
+[2026-07-16 17:02:52] [INFO] KAGE supervisor started
+[2026-07-16 17:02:52] [INFO] KAGE supervisor stopped
+[2026-07-16 17:03:36] [INFO] Context initialized
+[2026-07-16 17:03:36] [INFO] KAGE supervisor started
+[2026-07-16 17:03:36] [INFO] KAGE supervisor stopped
+[2026-07-16 17:04:30] [INFO] Context initialized
+[2026-07-16 17:04:30] [INFO] KAGE supervisor started
+[2026-07-16 17:04:30] [INFO] KAGE supervisor stopped
+[2026-07-16 17:30:54] [INFO] Context initialized
+[2026-07-16 17:30:54] [INFO] KAGE supervisor started
+[2026-07-16 17:30:54] [INFO] KAGE supervisor stopped
+[2026-07-16 17:34:54] [INFO] Context initialized
+[2026-07-16 17:34:54] [INFO] KAGE supervisor started
+[2026-07-16 17:34:54] [INFO] Waking agent: system
+[2026-07-16 17:34:54] [ERROR] Agent file not found: /root/kage-os/agents/agents/system/agent.py
+[2026-07-16 17:34:54] [INFO] KAGE supervisor stopped
+[2026-07-16 17:34:55] [INFO] Context initialized
+[2026-07-16 17:34:55] [INFO] KAGE supervisor started
+[2026-07-16 17:34:55] [INFO] KAGE supervisor stopped
+[2026-07-16 17:34:56] [INFO] Context initialized
+[2026-07-16 17:34:56] [INFO] KAGE supervisor started
+[2026-07-16 17:34:56] [INFO] KAGE supervisor stopped
+[2026-07-16 17:34:57] [INFO] Context initialized
+[2026-07-16 17:34:57] [INFO] KAGE supervisor started
+[2026-07-16 17:34:57] [INFO] KAGE supervisor stopped
+[2026-07-16 17:34:57] [INFO] Context initialized
+[2026-07-16 17:34:57] [INFO] KAGE supervisor started
+[2026-07-16 17:34:57] [INFO] KAGE supervisor stopped
+[2026-07-16 17:37:08] [INFO] Context initialized
+[2026-07-16 17:37:08] [INFO] KAGE supervisor started
+[2026-07-16 17:37:08] [INFO] Waking agent: system
+[2026-07-16 17:38:47] [INFO] Context initialized
+[2026-07-16 17:38:47] [INFO] KAGE supervisor started
+[2026-07-16 17:38:47] [INFO] Waking agent: system
+[2026-07-16 17:39:43] [INFO] Context initialized
+[2026-07-16 17:39:43] [INFO] KAGE supervisor started
+[2026-07-16 17:39:43] [INFO] Waking agent: system
+[2026-07-16 17:39:44] [INFO] Agent system done in 406ms
+[2026-07-16 17:39:44] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:17] [INFO] Context initialized
+[2026-07-16 17:40:17] [INFO] KAGE supervisor started
+[2026-07-16 17:40:17] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:18] [INFO] Context initialized
+[2026-07-16 17:40:18] [INFO] KAGE supervisor started
+[2026-07-16 17:40:18] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:19] [INFO] Context initialized
+[2026-07-16 17:40:19] [INFO] KAGE supervisor started
+[2026-07-16 17:40:19] [INFO] Waking agent: system
+[2026-07-16 17:40:20] [INFO] Agent system done in 364ms
+[2026-07-16 17:40:20] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:21] [INFO] Context initialized
+[2026-07-16 17:40:21] [INFO] KAGE supervisor started
+[2026-07-16 17:40:21] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:22] [INFO] Context initialized
+[2026-07-16 17:40:22] [INFO] KAGE supervisor started
+[2026-07-16 17:40:22] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:23] [INFO] Context initialized
+[2026-07-16 17:40:23] [INFO] KAGE supervisor started
+[2026-07-16 17:40:23] [INFO] KAGE supervisor stopped
+[2026-07-16 17:40:24] [INFO] Context initialized
+[2026-07-16 17:40:24] [INFO] KAGE supervisor started
+[2026-07-16 17:40:24] [INFO] KAGE supervisor stopped
+[2026-07-16 17:41:02] [INFO] Context initialized
+[2026-07-16 17:41:02] [INFO] KAGE supervisor started
+[2026-07-16 17:41:02] [INFO] KAGE supervisor stopped
+[2026-07-16 17:41:31] [INFO] Context initialized
+[2026-07-16 17:41:31] [INFO] KAGE supervisor started
+[2026-07-16 17:41:31] [INFO] KAGE supervisor stopped
+[2026-07-16 17:41:32] [INFO] Context initialized
+[2026-07-16 17:41:32] [INFO] KAGE supervisor started
+[2026-07-16 17:41:32] [INFO] KAGE supervisor stopped
+[2026-07-16 17:41:33] [INFO] Context initialized
+[2026-07-16 17:41:33] [INFO] KAGE supervisor started
+[2026-07-16 17:41:33] [INFO] KAGE supervisor stopped

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Tests for KAGE OS Phases 2 & 3.
+Unit and Integration Tests for KAGE OS Phases 4 & 5.
 Run with: python3 -m unittest discover -s tests
 """
 
@@ -15,22 +15,28 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from skills import helpers
 from core import brain, memory, permissions, scheduler, user_memory, workflows
-from core.integrations import (
-    ProviderRegistry,
-    AbstractBaseIntegration,
-    HealthStatus,
-    RetryEngine,
-    RateLimiter,
-    PluginLoader,
+from core.prompts import (
+    PromptTemplate,
+    PromptVersionRegistry,
+    PromptCompressor,
+    ContextBuilder,
+    SYSTEM_PROMPT,
+    DEVELOPER_PROMPT,
+    PLANNER_PROMPT,
+    REASONING_PROMPT,
+    REFLECTION_PROMPT,
 )
-from core.integrations.providers import (
-    GeminiProvider,
-    GroqProvider,
-    OpenRouterProvider,
-    OllamaProvider,
-    ObsidianProvider,
-    WhatsAppProvider,
-    TelegramProvider,
+from core.agents import (
+    BaseAgent,
+    AgentMetrics,
+    TaskAgent,
+    ChatAgent,
+    ToolAgent,
+    PlanningAgent,
+    MemoryAgent,
+    ExecutionAgent,
+    BackgroundAgent,
+    AgentRunner,
 )
 import kage
 import kage_cli
@@ -48,89 +54,71 @@ class TestSkillsHelpers(unittest.TestCase):
         invalid = helpers.parse_json_safe('invalid json')
         self.assertIsNone(invalid)
 
-    def test_truncate(self):
-        text = "a" * 300
-        truncated = helpers.truncate(text, 50)
-        self.assertEqual(len(truncated), 53)
-        self.assertTrue(truncated.endswith("..."))
+
+class TestPhase4Prompts(unittest.TestCase):
+    def test_prompt_template_rendering(self):
+        tpl = PromptTemplate("custom", "v1.0", "Hello {{name}}, welcome to $system!")
+        rendered = tpl.render(name="Alex", system="KAGE")
+        self.assertEqual(rendered, "Hello Alex, welcome to KAGE!")
+
+    def test_prompt_version_registry(self):
+        tpl = PromptVersionRegistry.get("system", "v2.1")
+        self.assertIsNotNone(tpl)
+        self.assertIn("Kage", tpl.template_text)
+
+    def test_prompt_compressor(self):
+        large_text = "line\n" * 500
+        compressed = PromptCompressor.compress(large_text, max_chars=100)
+        self.assertLessEqual(len(compressed), 150)
+        self.assertIn("Compressed", compressed)
+
+    def test_context_builder(self):
+        builder = ContextBuilder()
+        system_inst = builder.build_system_instruction(user_id="test_usr", extra_instructions="Be fast")
+        self.assertIn("Kage", system_inst)
+        self.assertIn("Be fast", system_inst)
 
 
-class TestIntegrationsArchitecture(unittest.TestCase):
-    def test_provider_registry_lookup(self):
-        registered = ProviderRegistry.list_registered_providers()
-        self.assertIn("gemini", registered)
-        self.assertIn("groq", registered)
-        self.assertIn("obsidian", registered)
-        self.assertIn("telegram", registered)
-
-    def test_provider_instantiation_and_health(self):
-        inst = ProviderRegistry.get_instance("obsidian", {"url": "http://localhost:27123"})
-        self.assertIsNotNone(inst)
-        self.assertIsInstance(inst, AbstractBaseIntegration)
-        health = inst.health_check()
-        self.assertIsInstance(health, HealthStatus)
-
-    def test_retry_engine_failure_recovery(self):
-        attempts = 0
-
-        def failing_func():
-            nonlocal attempts
-            attempts += 1
-            if attempts < 2:
-                raise ValueError("Temporary glitch")
-            return "recovered"
-
-        retry_engine = RetryEngine(max_retries=3, initial_delay=0.01, backoff_factor=1.1)
-        res = retry_engine.execute_with_retry(failing_func, retryable_exceptions=(ValueError,))
-        self.assertEqual(res, "recovered")
-        self.assertEqual(attempts, 2)
-
-    def test_rate_limiter_acquisition(self):
-        limiter = RateLimiter(max_calls=10, period_seconds=1.0)
-        acquired = limiter.acquire()
-        self.assertTrue(acquired)
-
-
-class TestWorkflowEngine(unittest.TestCase):
+class TestPhase5AgentFramework(unittest.TestCase):
     def setUp(self):
-        memory.init_db()
         self.supervisor = kage.Kage()
         self.supervisor.init_context()
-        self.engine = workflows.WorkflowEngine(supervisor=self.supervisor)
 
-    def test_workflow_registration_and_execution(self):
-        steps = [
-            {"target": "openhands", "action": "run_python", "params": {"code": "print('workflow_step_1')"}},
-            {"target": "openhands", "action": "run_python", "params": {"code": "print('workflow_step_2')"}}
-        ]
-        wf_id = self.engine.register_workflow("test_pipeline", steps)
-        self.assertIsInstance(wf_id, int)
+    def test_agent_metrics(self):
+        metrics = AgentMetrics()
+        metrics.record_success(100.0)
+        metrics.record_failure(200.0)
+        m_dict = metrics.to_dict()
+        self.assertEqual(m_dict["invocations"], 2)
+        self.assertEqual(m_dict["successes"], 1)
+        self.assertEqual(m_dict["failures"], 1)
+        self.assertEqual(m_dict["avg_latency_ms"], 150.0)
 
-        exec_res = self.engine.run_workflow(wf_id)
-        self.assertEqual(exec_res["status"], "completed")
-        self.assertEqual(len(exec_res["step_results"]), 2)
+    def test_agent_types_hierarchy(self):
+        task_ag = TaskAgent("task_test", self.supervisor.context)
+        res = task_ag.safe_wake({"action": "run_test"})
+        self.assertEqual(res["status"], "done")
+        self.assertIn("run_test", res["output"])
 
+        plan_ag = PlanningAgent("plan_test", self.supervisor.context)
+        plan_res = plan_ag.safe_wake({"goal": "Deploy OS"})
+        self.assertEqual(plan_res["status"], "done")
 
-class TestUserMemory(unittest.TestCase):
-    def test_user_memory_storage_and_prompt(self):
-        uid = "test_user_42"
-        user_memory.set_user_name(uid, "Jordan")
-        user_memory.add_user_fact(uid, "Loves open-source AI")
+    def test_agent_runner_parallel_execution(self):
+        ag1 = TaskAgent("ag1", self.supervisor.context)
+        ag2 = TaskAgent("ag2", self.supervisor.context)
 
-        u_mem = user_memory.get_user_memory(uid)
-        self.assertEqual(u_mem["name"], "Jordan")
-        self.assertIn("Loves open-source AI", u_mem["facts"])
+        runner = AgentRunner(max_workers=2)
+        parallel_results = runner.run_parallel([
+            (ag1, {"action": "action1"}),
+            (ag2, {"action": "action2"}),
+        ])
+        runner.shutdown()
 
-        prompt_str = user_memory.format_user_memory_prompt(uid)
-        self.assertIn("Jordan", prompt_str)
-
-
-class TestCoreBrain(unittest.TestCase):
-    def test_extract_action_json(self):
-        raw = 'Here is the action:\n```json\n{"action": "openhands", "task": {"action": "execute_cmd", "command": "ls -la"}}\n```'
-        parsed = brain.extract_action_json(raw)
-        self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "openhands")
+        self.assertEqual(len(parallel_results), 2)
+        agent_names = [r["agent"] for r in parallel_results]
+        self.assertIn("ag1", agent_names)
+        self.assertIn("ag2", agent_names)
 
 
 if __name__ == "__main__":

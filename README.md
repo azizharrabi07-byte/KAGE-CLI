@@ -1,10 +1,10 @@
-# KAGE OS — Production AI Operating System (Phases 2 & 3 Completed)
+# KAGE OS — Production AI Operating System (Phases 4 & 5 Completed)
 
-A modular, high-performance, local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Powered natively by **Google Gemini 2.5 Flash** with automated model fallbacks, a **Unified Integration Layer** (`core/integrations/`), persistent multi-step **Workflow Execution Engine** (`core/workflows.py`), Telegram Bot integration (@Mini_kage_bot), Obsidian Local REST API, WhatsApp microservice bridge, phone health telemetry, and universal core OS features for **Browser-Use**, **OpenHands Sandbox**, **Awesome MCP Protocol**, and **CrewAI Orchestrator**.
+A modular, high-performance, local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Powered natively by **Google Gemini 2.5 Flash** with automated model fallbacks, a **Modular Prompt Architecture** (`core/prompts/`), an **Extensible Agent Framework** (`core/agents/`), **Unified Integration Layer** (`core/integrations/`), persistent multi-step **Workflow Engine** (`core/workflows.py`), Telegram Bot integration (@Mini_kage_bot), Obsidian Local REST API, WhatsApp microservice bridge, phone health telemetry, and universal core OS features for **Browser-Use**, **OpenHands Sandbox**, **Awesome MCP Protocol**, and **CrewAI Orchestrator**.
 
 ---
 
-## Architecture Overview (Phases 2 & 3)
+## Architecture Overview (Phases 4 & 5)
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -14,47 +14,57 @@ A modular, high-performance, local terminal-based AI operating system designed f
                                      │ Unix Domain Socket IPC (~/.kage/kage.sock)
 ┌────────────────────────────────────▼──────────────────────────────────────┐
 │                    SUPERVISOR DAEMON (kage.py)                            │
-│  Auto-Spawns Telegram Worker • Manages WorkflowEngine • Shared Context    │
+│  Auto-Spawns Background Services • Manages AgentRunner Thread Pool        │
 └────────────────────────────────────┬──────────────────────────────────────┘
-                                     │ Unified Provider Registry
+                                     │ Shared Context
       ┌──────────────────────────────┼──────────────────────────────┐
       │                              │                              │
 ┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐
-│  GEMINI 2.5 FLASH BRAIN   │  │   UNIVERSAL OS FEATURES   │  │ UNIFIED INTEGRATION LAYER │
-│    (core/brain.py)        │  │     (core/features/)      │  │    (core/integrations/)   │
+│ MODULAR PROMPT ENGINE     │  │  EXTENSIBLE AGENT FRAMEWORK│  │ UNIFIED INTEGRATION LAYER │
+│     (core/prompts/)       │  │      (core/agents/)        │  │    (core/integrations/)   │
 ├───────────────────────────┤  ├───────────────────────────┤  ├───────────────────────────┤
-│ • Direct Google REST API  │  │ • browser (browser-use)   │  │ • AbstractBaseIntegration │
-│ • Automated Model Failover│  │ • openhands (Code/Sandbox)│  │ • ProviderRegistry        │
-│ • ReAct Reasoning Loop    │  │ • mcp (Awesome MCP)       │  │ • RetryEngine / Limiter   │
-│ • Per-User Memory Context │  │ • crew (CrewAI Teams)     │  │ • Dynamic PluginLoader    │
+│ • PromptTemplate          │  │ • BaseAgent Interface     │  │ • AbstractBaseIntegration │
+│ • PromptVersionRegistry   │  │ • TaskAgent / ChatAgent   │  │ • ProviderRegistry        │
+│ • PromptCompressor        │  │ • Tool / PlanningAgent    │  │ • RetryEngine / Limiter   │
+│ • ContextBuilder          │  │ • Memory / ExecutionAgent │  │ • Dynamic PluginLoader    │
+│ • 12 Standard Blueprints  │  │ • AgentRunner Parallel Pool│  │ • 7 Production Providers  │
 └───────────────────────────┘  └───────────────────────────┘  └───────────────────────────┘
 ```
 
 ---
 
-## Key Phase 2 & 3 Upgrades
+## Key Phase 4 & 5 Architectural Features
 
-### 1. Unified Integration Layer (`core/integrations/`)
-Every external service and AI provider inherits from `AbstractBaseIntegration`:
-* **`ProviderRegistry`**: Dynamic registration and lookup of active provider singletons (`GeminiProvider`, `GroqProvider`, `OpenRouterProvider`, `OllamaProvider`, `ObsidianProvider`, `WhatsAppProvider`, `TelegramProvider`).
-* **`RetryEngine`**: Exponential backoff with jitter and configurable retry limits.
-* **`RateLimiter`**: Sliding window rate limiter preventing API quota exhaustion.
-* **`HealthStatus`**: Standardized health check monitoring with latency tracking in milliseconds.
-* **`PluginLoader`**: Scans `~/.kage/plugins` and `plugins/` to register third-party integration classes dynamically.
+### 1. Modular Prompt Architecture (`core/prompts/`)
+All hardcoded prompts extracted into a central, version-controlled templating framework:
+* **`PromptTemplate`**: Interpolates `$variable` and `{{variable}}` blueprints with typing validation.
+* **`PromptVersionRegistry`**: Maintains prompt versioning (`v1.0`, `v2.1`, `latest`) and variation registries.
+* **`PromptCompressor`**: Context window optimizer performing smart whitespace pruning, line deduplication, and budget truncation.
+* **`ContextBuilder`**: Assembles user prompts, chat history windows, and persistent memory context into LLM payloads.
+* **Standard Specialized Prompts**: `SystemPrompt`, `DeveloperPrompt`, `ToolPrompt`, `PlannerPrompt`, `ReasoningPrompt`, `MemoryPrompt`, `SummarizerPrompt`, `AgentPrompt`, `ReflectionPrompt`, `ExecutionPrompt`, `SafetyPrompt`, `ErrorRecoveryPrompt`.
 
-### 2. Multi-Step Workflow Engine (`core/workflows.py`)
-* **Persistence & Context Interpolation**: Persists structured multi-step pipelines in `kage.db` with status state machines (`pending` $\rightarrow$ `running` $\rightarrow$ `completed` / `failed`).
-* **Step Data Chaining**: Step $N$ results are automatically made available to step $N+1$ via double-curly interpolation (`{{step_1.output}}`).
+### 2. Extensible Agent Framework (`core/agents/`)
+* **`BaseAgent`**: Abstract Base Class defining standard agent state, tool registration, cancellation signals, metrics collection, and reasoning hooks (`plan()`, `reason()`, `reflect()`).
+* **Specialized Class Hierarchy**:
+  * `TaskAgent` — Domain task execution.
+  * `ChatAgent` — Multi-turn conversational routing.
+  * `ToolAgent` — Tool & API integration wrappers.
+  * `PlanningAgent` — Sequential execution plan construction.
+  * `MemoryAgent` — Fact extraction & user context storage.
+  * `ExecutionAgent` — Sandboxed terminal shell & Python evaluation.
+  * `BackgroundAgent` — Long-polling workers & persistent service daemons.
+* **`AgentRunner`**: Thread pool worker manager (`ThreadPoolExecutor`) enabling concurrent multi-agent task execution.
+* **`AgentMetrics`**: Latency, invocation, success, and failure analytics tracking per agent.
 
 ---
 
 ## Quick Start & Commands
 
 ```bash
-# 1. Start Supervisor Daemon (spawns background workers and workflow engine)
+# 1. Start Background Daemon
 kage daemon start
 
-# 2. Open Interactive Terminal Shell
+# 2. Open OpenCode Interactive Terminal REPL
 kage
 ```
 

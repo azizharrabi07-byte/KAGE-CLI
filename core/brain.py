@@ -119,7 +119,6 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
     primary_model = os.environ.get("LLM_MODEL") or llm_config.get("model", "")
     base_url = os.environ.get("LLM_BASE_URL") or llm_config.get("base_url", "")
 
-    # Set default model per provider if unspecified
     if not primary_model:
         primary_model = PROVIDER_MODELS.get(provider, ["gemini-2.5-flash"])[0]
 
@@ -242,7 +241,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
         except Exception as e:
             return {"role": "assistant", "content": f"[Ollama LLM Error: {e}]", "model": primary_model, "error": str(e)}
 
-    # 4. OpenRouter Provider (Default OpenRouter/OpenAI fallback)
+    # 4. OpenRouter Provider
     else:
         endpoint = base_url or "https://openrouter.ai/api/v1"
         full_messages = []
@@ -283,6 +282,7 @@ CORE FEATURES:
 
 DOMAIN AGENTS:
 - whatsapp: Send/read WhatsApp messages (action: "whatsapp", task: {"action": "send"|"read", "to": "...", "text": "..."})
+- telegram: Send/read Telegram bot messages (action: "telegram", task: {"action": "send_message"|"status", "chat_id": "...", "text": "..."})
 - obsidian: Read/write Obsidian notes via Local REST API (action: "obsidian", task: {"action": "read_file"|"write_file"|"list_files"|"search", "path": "...", "content": "..."})
 - system: Check phone health, battery, storage, CPU (action: "system", task: {})
 - meta: Self-upgrade via git pull (action: "meta", task: {"action": "check"|"pull"})
@@ -292,3 +292,26 @@ To trigger any feature or agent action, emit a single JSON action block:
 
 Keep responses short and direct. You are efficient and helpful.
 """
+
+class brain:
+    def __init__(self):
+        pass
+    def ask(self, prompt: str) -> str:
+        from .brain import call_llm, KAGE_SYSTEM_PROMPT
+        messages = [{"role": "user", "content": prompt}]
+        result = call_llm(messages, system=KAGE_SYSTEM_PROMPT)
+        return result.get("content", "")
+
+# Also create an alias for uppercase (if needed)
+Brain = brain
+
+class brain:
+    def __init__(self):
+        pass
+    def ask(self, prompt: str) -> str:
+        # call_llm and KAGE_SYSTEM_PROMPT are already defined in this module
+        messages = [{"role": "user", "content": prompt}]
+        result = call_llm(messages, system=KAGE_SYSTEM_PROMPT)
+        return result.get("content", "")
+
+Brain = brain

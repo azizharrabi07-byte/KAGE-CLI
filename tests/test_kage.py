@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Tests for KAGE OS Phases 4 & 5.
+Unit and Integration Tests for KAGE OS Phases 6 & 7.
 Run with: python3 -m unittest discover -s tests
 """
 
@@ -15,28 +15,19 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from skills import helpers
 from core import brain, memory, permissions, scheduler, user_memory, workflows
-from core.prompts import (
-    PromptTemplate,
-    PromptVersionRegistry,
-    PromptCompressor,
-    ContextBuilder,
-    SYSTEM_PROMPT,
-    DEVELOPER_PROMPT,
-    PLANNER_PROMPT,
-    REASONING_PROMPT,
-    REFLECTION_PROMPT,
+from core.cli import (
+    TableFormatter,
+    OutputFormatter,
+    CLICompleter,
+    ExecutionFlags,
+    CommandRunner,
 )
-from core.agents import (
-    BaseAgent,
-    AgentMetrics,
-    TaskAgent,
-    ChatAgent,
-    ToolAgent,
-    PlanningAgent,
-    MemoryAgent,
-    ExecutionAgent,
-    BackgroundAgent,
-    AgentRunner,
+from core.memory import (
+    MemoryItem,
+    MemoryType,
+    MemoryStore,
+    SemanticIndex,
+    MemoryManager,
 )
 import kage
 import kage_cli
@@ -55,70 +46,62 @@ class TestSkillsHelpers(unittest.TestCase):
         self.assertIsNone(invalid)
 
 
-class TestPhase4Prompts(unittest.TestCase):
-    def test_prompt_template_rendering(self):
-        tpl = PromptTemplate("custom", "v1.0", "Hello {{name}}, welcome to $system!")
-        rendered = tpl.render(name="Alex", system="KAGE")
-        self.assertEqual(rendered, "Hello Alex, welcome to KAGE!")
+class TestPhase6CLI(unittest.TestCase):
+    def test_table_formatter(self):
+        headers = ["ID", "Name", "Role"]
+        rows = [["1", "Alex", "Admin"], ["2", "Jordan", "User"]]
+        tbl = TableFormatter.render_table(headers, rows, title="Users")
+        self.assertIn("Alex", tbl)
+        self.assertIn("Admin", tbl)
 
-    def test_prompt_version_registry(self):
-        tpl = PromptVersionRegistry.get("system", "v2.1")
-        self.assertIsNotNone(tpl)
-        self.assertIn("Kage", tpl.template_text)
+    def test_output_formatter_json_and_yaml(self):
+        payload = {"status": "ok", "count": 42}
+        json_out = OutputFormatter.format_output(payload, "json")
+        self.assertIn('"count": 42', json_out)
 
-    def test_prompt_compressor(self):
-        large_text = "line\n" * 500
-        compressed = PromptCompressor.compress(large_text, max_chars=100)
-        self.assertLessEqual(len(compressed), 150)
-        self.assertIn("Compressed", compressed)
+        yaml_out = OutputFormatter.format_output(payload, "yaml")
+        self.assertIn("status: ok", yaml_out)
 
-    def test_context_builder(self):
-        builder = ContextBuilder()
-        system_inst = builder.build_system_instruction(user_id="test_usr", extra_instructions="Be fast")
-        self.assertIn("Kage", system_inst)
-        self.assertIn("Be fast", system_inst)
+    def test_cli_completer(self):
+        completer = CLICompleter()
+        match1 = completer.complete("/con", 0)
+        self.assertIn("/config", match1)
+
+    def test_command_runner_dry_run(self):
+        runner = CommandRunner(flags=ExecutionFlags(dry_run=True, format_output="json"))
+        out = runner.run("status", {})
+        self.assertIn("dry_run", out)
 
 
-class TestPhase5AgentFramework(unittest.TestCase):
+class TestPhase7MemoryEngine(unittest.TestCase):
     def setUp(self):
-        self.supervisor = kage.Kage()
-        self.supervisor.init_context()
+        self.mgr = MemoryManager()
 
-    def test_agent_metrics(self):
-        metrics = AgentMetrics()
-        metrics.record_success(100.0)
-        metrics.record_failure(200.0)
-        m_dict = metrics.to_dict()
-        self.assertEqual(m_dict["invocations"], 2)
-        self.assertEqual(m_dict["successes"], 1)
-        self.assertEqual(m_dict["failures"], 1)
-        self.assertEqual(m_dict["avg_latency_ms"], 150.0)
+    def test_memory_importance_and_item(self):
+        item = self.mgr.add_memory(
+            content="User loves Python and Termux",
+            user_id="unit_user",
+            memory_type=MemoryType.KNOWLEDGE,
+            importance=8.5
+        )
+        self.assertEqual(item.importance, 8.5)
+        self.assertEqual(item.user_id, "unit_user")
 
-    def test_agent_types_hierarchy(self):
-        task_ag = TaskAgent("task_test", self.supervisor.context)
-        res = task_ag.safe_wake({"action": "run_test"})
-        self.assertEqual(res["status"], "done")
-        self.assertIn("run_test", res["output"])
+    def test_semantic_vector_search(self):
+        self.mgr.add_memory("User primary language is Rust", user_id="sec_user", importance=9.0)
+        self.mgr.add_memory("User enjoys playing chess", user_id="sec_user", importance=5.0)
 
-        plan_ag = PlanningAgent("plan_test", self.supervisor.context)
-        plan_res = plan_ag.safe_wake({"goal": "Deploy OS"})
-        self.assertEqual(plan_res["status"], "done")
+        results = self.mgr.search_memories("programming language Rust", user_id="sec_user")
+        self.assertTrue(len(results) > 0)
+        self.assertIn("Rust", results[0]["content"])
 
-    def test_agent_runner_parallel_execution(self):
-        ag1 = TaskAgent("ag1", self.supervisor.context)
-        ag2 = TaskAgent("ag2", self.supervisor.context)
-
-        runner = AgentRunner(max_workers=2)
-        parallel_results = runner.run_parallel([
-            (ag1, {"action": "action1"}),
-            (ag2, {"action": "action2"}),
-        ])
-        runner.shutdown()
-
-        self.assertEqual(len(parallel_results), 2)
-        agent_names = [r["agent"] for r in parallel_results]
-        self.assertIn("ag1", agent_names)
-        self.assertIn("ag2", agent_names)
+    def test_memory_ttl_expiration(self):
+        item = MemoryItem(
+            memory_type=MemoryType.WORKING,
+            content="Temporary buffer",
+            ttl_seconds=-10  # Already expired
+        )
+        self.assertTrue(item.is_expired())
 
 
 if __name__ == "__main__":

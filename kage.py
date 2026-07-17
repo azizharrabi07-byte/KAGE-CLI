@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-kage.py — Main daemon / supervisor loop & IPC server.
+kage.py — Main daemon / supervisor loop & IPC server with multi-step ReAct agent feedback loop.
 Runs background thread pool, listens on Unix domain socket for CLI commands,
 hosts the background scheduler, and exposes built-in features (Browser-Use, OpenHands, MCP, CrewAI).
 """
@@ -32,8 +32,8 @@ class Kage:
     def __init__(self):
         self.running = True
         self.agents_dir = KAGE_DIR / "agents"
-        self.context = None  # Set after init
-        self._loaded_agents = {}  # Cache of loaded agent modules
+        self.context = None
+        self._loaded_agents = {}
         self.scheduler = None
 
     def log(self, msg: str, level: str = "INFO"):
@@ -68,7 +68,6 @@ class Kage:
         self.context = ctx
         memory.init_db()
 
-        # Initialize background scheduler
         self.scheduler = scheduler.Scheduler(wake_fn=self.wake)
         self._load_schedules_into_scheduler()
         self.scheduler.start()
@@ -194,69 +193,88 @@ class Kage:
         else:
             return {"status": "error", "output": f"Unknown command: {command}"}
 
+    def _execute_action_payload(self, action_type: str, task_data: dict) -> dict:
+        """Execute a feature or agent action and return structured output."""
+        if action_type == "browser":
+            fn = task_data.get("action", "search")
+            if fn == "search":
+                res = self.context.browser.search(task_data.get("query", ""))
+            else:
+                res = self.context.browser.fetch(task_data.get("url", task_data.get("query", "")))
+            return {"status": "done", "output": res}
+
+        elif action_type == "openhands":
+            fn = task_data.get("action", "execute_cmd")
+            if fn in ("execute_cmd", "cmd"):
+                res = self.context.openhands.execute_cmd(task_data.get("command", ""))
+            elif fn == "run_python":
+                res = self.context.openhands.run_python(task_data.get("code", ""))
+            else:
+                res = self.context.openhands.write_code(task_data.get("path", ""), task_data.get("content", ""))
+            return {"status": "done", "output": res}
+
+        elif action_type == "mcp":
+            fn = task_data.get("action", "list_servers")
+            if fn == "list_servers":
+                res = self.context.mcp.list_servers()
+            else:
+                res = self.context.mcp.call_tool(task_data.get("server", ""), task_data.get("tool", ""), task_data.get("args", {}))
+            return {"status": "done", "output": res}
+
+        elif action_type == "crew":
+            res = self.context.crew.run_crew(
+                crew_agents=task_data.get("agents", []),
+                tasks=task_data.get("tasks", []),
+                template=task_data.get("template", ""),
+                topic=task_data.get("topic", "")
+            )
+            return {"status": "done", "output": res}
+
+        else:
+            return self.wake(action_type, task_data)
+
     def _handle_chat(self, message: str) -> dict:
-        """Route a chat message through brain and execute requested feature or agent action."""
+        """Route message through brain with multi-turn automated feature chaining (ReAct Loop)."""
         from core.brain import call_llm, extract_action_json, KAGE_SYSTEM_PROMPT
 
-        result = call_llm(
-            messages=[{"role": "user", "content": message}],
-            system=KAGE_SYSTEM_PROMPT,
-        )
+        messages = [{"role": "user", "content": message}]
+        max_turns = 3
+        last_action_result = None
 
-        content = result.get("content", "")
+        for turn in range(max_turns):
+            llm_res = call_llm(messages=messages, system=KAGE_SYSTEM_PROMPT)
+            content = llm_res.get("content", "")
 
-        action = extract_action_json(content)
-        if action:
-            action_type = action.get("action", "")
-            task_data = action.get("task", {})
-
-            # 1. Feature direct invocation
-            if action_type == "browser":
-                fn = task_data.get("action", "search")
-                if fn == "search":
-                    res = self.context.browser.search(task_data.get("query", ""))
-                else:
-                    res = self.context.browser.fetch(task_data.get("url", task_data.get("query", "")))
-                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
-
-            elif action_type == "openhands":
-                fn = task_data.get("action", "execute_cmd")
-                if fn in ("execute_cmd", "cmd"):
-                    res = self.context.openhands.execute_cmd(task_data.get("command", ""))
-                elif fn == "run_python":
-                    res = self.context.openhands.run_python(task_data.get("code", ""))
-                else:
-                    res = self.context.openhands.write_code(task_data.get("path", ""), task_data.get("content", ""))
-                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
-
-            elif action_type == "mcp":
-                fn = task_data.get("action", "list_servers")
-                if fn == "list_servers":
-                    res = self.context.mcp.list_servers()
-                else:
-                    res = self.context.mcp.call_tool(task_data.get("server", ""), task_data.get("tool", ""), task_data.get("args", {}))
-                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
-
-            elif action_type == "crew":
-                res = self.context.crew.run_crew(
-                    crew_agents=task_data.get("agents", []),
-                    tasks=task_data.get("tasks", []),
-                    template=task_data.get("template", ""),
-                    topic=task_data.get("topic", "")
-                )
-                return {"status": "done", "input": message, "brain_response": content, "agent_result": {"status": "done", "output": res}}
-
-            # 2. Domain Agent invocation
-            elif action_type:
-                agent_result = self.wake(action_type, task_data)
+            action = extract_action_json(content)
+            if not action:
+                # No tool required or final answer produced
                 return {
                     "status": "done",
                     "input": message,
-                    "brain_response": content,
-                    "agent_result": agent_result,
+                    "response": content,
+                    "agent_result": last_action_result
                 }
 
-        return {"status": "done", "input": message, "response": content}
+            action_type = action.get("action", "")
+            task_data = action.get("task", {})
+
+            # Execute tool action
+            last_action_result = self._execute_action_payload(action_type, task_data)
+
+            # Append assistant response and tool output observation to message history
+            messages.append({"role": "assistant", "content": content})
+            tool_output_str = json.dumps(last_action_result.get("output", last_action_result), default=str)
+            messages.append({
+                "role": "user",
+                "content": f"[Observation from {action_type} execution]: {tool_output_str[:3000]}\n\nSummarize result or execute next step if needed."
+            })
+
+        return {
+            "status": "done",
+            "input": message,
+            "response": content,
+            "agent_result": last_action_result
+        }
 
     def _handle_features_command(self, args: dict) -> dict:
         """Expose built-in feature execution via CLI."""

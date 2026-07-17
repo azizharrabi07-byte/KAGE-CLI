@@ -4,6 +4,11 @@
         "timeout": 30,
         "description": "Send and read WhatsApp messages via Baileys bridge"
     },
+    "telegram": {
+        "path": "telegram",
+        "timeout": 60,
+        "description": "Telegram Bot interface (@Mini_kage_bot) for remote command dispatch"
+    },
     "obsidian": {
         "path": "obsidian",
         "timeout": 15,

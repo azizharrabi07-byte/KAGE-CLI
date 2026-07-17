@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
 brain.py — Dynamic LLM Router supporting Google Gemini, Groq, OpenRouter, and Ollama.
-Reloads config dynamically on every call to support live provider and model switching.
+Reloads config dynamically on every call, injects per-user memory context (~/.kage/memory.json),
+and structures tool action payloads.
 """
 
 import json
@@ -11,6 +12,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
+
+from core.user_memory import format_user_memory_prompt
 
 # Provider model directory
 PROVIDER_MODELS = {
@@ -109,8 +112,8 @@ def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
     return None
 
 
-def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -> Dict:
-    """Call active provider LLM (Gemini, Groq, OpenRouter, or Ollama) with dynamic config loading."""
+def call_llm(messages: List[Dict], system: str = "", user_id: str = "default", temperature: float = 0.7) -> Dict:
+    """Call active provider LLM with dynamic user memory injection and model fallback."""
     config = _load_config()
     llm_config = config.get("llm", {})
 
@@ -121,6 +124,10 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 
     if not primary_model:
         primary_model = PROVIDER_MODELS.get(provider, ["gemini-2.5-flash"])[0]
+
+    # Inject user memory into system instruction
+    memory_context = format_user_memory_prompt(user_id)
+    full_system = f"{system or KAGE_SYSTEM_PROMPT}\n\n{memory_context}"
 
     if not api_key and provider != "ollama" and api_key in ("", "YOUR_KEY_HERE", "YOUR_GEMINI_API_KEY_HERE"):
         last_msg = messages[-1]["content"] if messages else "no input"
@@ -152,11 +159,9 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 
                 payload = {
                     "contents": contents,
-                    "generationConfig": {"temperature": temperature}
+                    "generationConfig": {"temperature": temperature},
+                    "systemInstruction": {"parts": [{"text": full_system}]}
                 }
-
-                if system:
-                    payload["systemInstruction"] = {"parts": [{"text": system}]}
 
                 resp = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=60)
 
@@ -186,9 +191,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
     # 2. Groq Provider
     elif provider == "groq":
         endpoint = base_url or "https://api.groq.com/openai/v1"
-        full_messages = []
-        if system:
-            full_messages.append({"role": "system", "content": system})
+        full_messages = [{"role": "system", "content": full_system}]
         full_messages.extend(messages)
 
         try:
@@ -201,7 +204,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
             if resp.status_code == 429:
                 return {
                     "role": "assistant",
-                    "content": f"⚠️ Groq rate limit exceeded (429) on model '{primary_model}'. Try switching model e.g. '/config set llm.model llama-3.3-70b-versatile' or waiting.",
+                    "content": f"⚠️ Groq rate limit exceeded (429) on model '{primary_model}'. Try switching model or provider.",
                     "model": primary_model,
                     "error": "rate_limit",
                 }
@@ -215,9 +218,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
     # 3. Ollama Local Provider
     elif provider == "ollama":
         endpoint = base_url or "http://localhost:11434/v1"
-        full_messages = []
-        if system:
-            full_messages.append({"role": "system", "content": system})
+        full_messages = [{"role": "system", "content": full_system}]
         full_messages.extend(messages)
 
         try:
@@ -244,9 +245,7 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
     # 4. OpenRouter Provider
     else:
         endpoint = base_url or "https://openrouter.ai/api/v1"
-        full_messages = []
-        if system:
-            full_messages.append({"role": "system", "content": system})
+        full_messages = [{"role": "system", "content": full_system}]
         full_messages.extend(messages)
 
         try:
@@ -272,46 +271,25 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 
 
 KAGE_SYSTEM_PROMPT = """You are Kage — a unified personal AI operating system running on the user's phone.
-You have native access to core OS features AND domain agents:
+You remember user preferences across sessions and execute action blocks using all available integrations.
 
-CORE FEATURES:
-- browser: Web search and live webpage scraping (action: "browser", task: {"action": "search"|"fetch", "query": "...", "url": "..."})
-- openhands: Sandboxed bash command execution, Python snippet evaluation, and workspace file writing (action: "openhands", task: {"action": "execute_cmd"|"run_python"|"write_code", "command": "...", "code": "..."})
-- mcp: Connect to local/remote Model Context Protocol tool servers (action: "mcp", task: {"action": "list_servers"|"call_tool", "server": "...", "tool": "...", "args": {}})
-- crew: Multi-role AI agent crew orchestration (action: "crew", task: {"action": "run_crew", "template": "...", "topic": "..."})
+AVAILABLE ACTIONS & INTEGRATIONS:
+- system: Check phone health, battery, storage, CPU, uptime (action: "system", task: {})
+- openhands: Sandboxed bash execution, Python snippet evaluation, and workspace file synthesis (action: "openhands", task: {"action": "execute_cmd"|"run_python"|"write_code", "command": "...", "code": "..."})
+- crew: Multi-role sequential AI agent team task execution (action: "crew", task: {"action": "run_crew", "template": "...", "topic": "..."})
+- obsidian: Read/write Markdown notes via Obsidian Local REST API on port 27123 (action: "obsidian", task: {"action": "read_file"|"write_file"|"list_files"|"search", "path": "...", "content": "..."})
+- whatsapp: Send/read WhatsApp messages over Baileys bridge (action: "whatsapp", task: {"action": "send"|"read", "to": "...", "text": "..."})
+- telegram: Dispatch Telegram bot messages (action: "telegram", task: {"action": "send_message"|"status", "chat_id": "...", "text": "..."})
+- browser: Live web search & web page content scraping (action: "browser", task: {"action": "search"|"fetch", "query": "...", "url": "..."})
+- mcp: Call tool endpoints on remote/local Model Context Protocol servers (action: "mcp", task: {"action": "list_servers"|"call_tool", "server": "...", "tool": "...", "args": {}})
+- memory: Save user details, facts, or preferences to persistent memory (action: "memory", task: {"action": "remember", "fact": "...", "name": "..."})
 
-DOMAIN AGENTS:
-- whatsapp: Send/read WhatsApp messages (action: "whatsapp", task: {"action": "send"|"read", "to": "...", "text": "..."})
-- telegram: Send/read Telegram bot messages (action: "telegram", task: {"action": "send_message"|"status", "chat_id": "...", "text": "..."})
-- obsidian: Read/write Obsidian notes via Local REST API (action: "obsidian", task: {"action": "read_file"|"write_file"|"list_files"|"search", "path": "...", "content": "..."})
-- system: Check phone health, battery, storage, CPU (action: "system", task: {})
-- meta: Self-upgrade via git pull (action: "meta", task: {"action": "check"|"pull"})
+MANDATORY INSTRUCTION:
+When the user asks you to execute a task requiring an external integration, OS feature, or memory update, respond with a JSON action block:
+{"action": "<action_name>", "task": {<task_data>}}
 
-To trigger any feature or agent action, emit a single JSON action block:
-{"action": "<feature_or_agent_name>", "task": {<task_data>}}
+If the user mentions facts about themselves (e.g. "My name is Alex" or "Remember that I like Python"), emit a memory action block or update their memory:
+{"action": "memory", "task": {"action": "remember", "fact": "...", "name": "..."}}
 
-Keep responses short and direct. You are efficient and helpful.
+If no action is required, reply directly. Keep answers concise, clear, and efficient.
 """
-
-class brain:
-    def __init__(self):
-        pass
-    def ask(self, prompt: str) -> str:
-        from .brain import call_llm, KAGE_SYSTEM_PROMPT
-        messages = [{"role": "user", "content": prompt}]
-        result = call_llm(messages, system=KAGE_SYSTEM_PROMPT)
-        return result.get("content", "")
-
-# Also create an alias for uppercase (if needed)
-Brain = brain
-
-class brain:
-    def __init__(self):
-        pass
-    def ask(self, prompt: str) -> str:
-        # call_llm and KAGE_SYSTEM_PROMPT are already defined in this module
-        messages = [{"role": "user", "content": prompt}]
-        result = call_llm(messages, system=KAGE_SYSTEM_PROMPT)
-        return result.get("content", "")
-
-Brain = brain

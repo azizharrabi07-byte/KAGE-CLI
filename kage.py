@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 kage.py — Main daemon / supervisor loop & IPC server with multi-step ReAct agent feedback loop.
-Runs background thread pool, listens on Unix domain socket for CLI commands,
-hosts the background scheduler, and logs supervisor events to kage.log.
+Hosts background scheduler, auto-spawns background services (Telegram bot),
+executes core OS features (Browser-Use, OpenHands, MCP, CrewAI, Memory), and logs supervisor events to kage.log.
 """
 
 import json
@@ -12,6 +12,7 @@ import time
 import socket
 import signal
 import threading
+import subprocess
 import importlib.util
 from pathlib import Path
 from datetime import datetime
@@ -25,9 +26,10 @@ KAGE_OS_DIR = Path.home() / "kage-os"
 
 LOCK_FILE = KAGE_HOME / "kage.pid"
 SOCKET_FILE = KAGE_HOME / "kage.sock"
+TELEGRAM_PID_FILE = KAGE_HOME / "telegram.pid"
+
 
 def resolve_log_file() -> Path:
-    """Resolve active log file path prioritizing ~/kage-os/kage.log, ~/.kage/kage.log, or local directory."""
     if KAGE_OS_DIR.exists():
         return KAGE_OS_DIR / "kage.log"
     return KAGE_HOME / "kage.log"
@@ -49,8 +51,7 @@ class Kage:
         """Log structured timestamped messages to log files."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line = f"[{timestamp}] [{level}] {msg}"
-        
-        # Write to resolved log file
+
         log_paths = [LOG_FILE, KAGE_HOME / "kage.log"]
         if KAGE_OS_DIR.exists():
             log_paths.append(KAGE_OS_DIR / "kage.log")
@@ -68,13 +69,14 @@ class Kage:
                 pass
 
     def init_context(self):
-        """Initialize shared context (brain, memory, permissions, and core features)."""
-        from core import memory, permissions, scheduler
+        """Initialize shared context (brain, memory, permissions, user_memory, and core features)."""
+        from core import memory, permissions, scheduler, user_memory
         from core.features import BrowserFeature, OpenHandsFeature, MCPFeature, CrewFeature
 
         ctx = type("Context", (), {
             "brain": self,
             "memory": memory,
+            "user_memory": user_memory,
             "permissions": permissions,
             "browser": BrowserFeature(),
             "openhands": OpenHandsFeature(),
@@ -93,10 +95,39 @@ class Kage:
         self._load_schedules_into_scheduler()
         self.scheduler.start()
 
-        self.log("Context, core features, and scheduler initialized")
+        self.ensure_telegram_bot_daemon()
+
+        self.log("Context, core features, user memory engine, and scheduler initialized")
+
+    def ensure_telegram_bot_daemon(self):
+        """Ensure Telegram bot polling daemon is running if configured."""
+        if TELEGRAM_PID_FILE.exists():
+            try:
+                pid = int(TELEGRAM_PID_FILE.read_text().strip())
+                os.kill(pid, 0)
+                return
+            except Exception:
+                try:
+                    TELEGRAM_PID_FILE.unlink()
+                except Exception:
+                    pass
+
+        tg_agent_py = self.agents_dir / "telegram" / "agent.py"
+        if tg_agent_py.exists():
+            try:
+                proc = subprocess.Popen(
+                    [sys.executable, str(tg_agent_py)],
+                    cwd=str(KAGE_DIR),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
+                TELEGRAM_PID_FILE.write_text(str(proc.pid))
+                self.log(f"Spawned background Telegram bot process (PID {proc.pid})")
+            except Exception as e:
+                self.log(f"Failed starting Telegram bot daemon: {e}", "ERROR")
 
     def _load_schedules_into_scheduler(self):
-        """Load saved schedule jobs from database into scheduler."""
         if not self.scheduler or not self.context:
             return
         try:
@@ -116,7 +147,6 @@ class Kage:
             self.log(f"Failed to load schedules: {e}", "ERROR")
 
     def load_agent(self, agent_name: str):
-        """Load an agent module (lazy import)."""
         if agent_name in self._loaded_agents:
             return self._loaded_agents[agent_name]
 
@@ -159,7 +189,6 @@ class Kage:
             return None
 
     def wake(self, agent_name: str, task_data: dict) -> dict:
-        """Wake an agent, execute task, then sleep it."""
         self.log(f"Waking agent: {agent_name}")
 
         agent = self.load_agent(agent_name)
@@ -193,9 +222,8 @@ class Kage:
         return result
 
     def process_command(self, command: str, args: dict) -> dict:
-        """Process a CLI command or feature call."""
         if command == "chat":
-            return self._handle_chat(args.get("message", ""))
+            return self._handle_chat(args.get("message", ""), user_id=args.get("user_id", "default"))
         elif command == "agent":
             return self._handle_agent_command(args)
         elif command == "features":
@@ -214,8 +242,8 @@ class Kage:
         else:
             return {"status": "error", "output": f"Unknown command: {command}"}
 
-    def _execute_action_payload(self, action_type: str, task_data: dict) -> dict:
-        """Execute a feature or agent action and return structured output."""
+    def _execute_action_payload(self, action_type: str, task_data: dict, user_id: str = "default") -> dict:
+        """Execute feature, memory, or agent action and return structured output."""
         if action_type == "browser":
             fn = task_data.get("action", "search")
             if fn == "search":
@@ -251,11 +279,33 @@ class Kage:
             )
             return {"status": "done", "output": res}
 
+        elif action_type == "memory":
+            from core import user_memory
+            uid = task_data.get("user_id", user_id)
+            name = task_data.get("name")
+            fact = task_data.get("fact")
+            key = task_data.get("key")
+            val = task_data.get("value")
+
+            saved_items = []
+            if name:
+                user_memory.set_user_name(uid, name)
+                saved_items.append(f"name = '{name}'")
+            if fact:
+                user_memory.add_user_fact(uid, fact)
+                saved_items.append(f"fact = '{fact}'")
+            if key and val is not None:
+                user_memory.set_user_kv(uid, key, val)
+                saved_items.append(f"{key} = '{val}'")
+
+            msg = f"Stored memory for user '{uid}': " + ", ".join(saved_items) if saved_items else f"Updated memory for user '{uid}'"
+            return {"status": "done", "output": msg}
+
         else:
             return self.wake(action_type, task_data)
 
-    def _handle_chat(self, message: str) -> dict:
-        """Route message through brain with multi-turn automated feature chaining (ReAct Loop)."""
+    def _handle_chat(self, message: str, user_id: str = "default") -> dict:
+        """Route message through brain with user memory context and multi-turn ReAct loop."""
         from core.brain import call_llm, extract_action_json, KAGE_SYSTEM_PROMPT
 
         messages = [{"role": "user", "content": message}]
@@ -263,7 +313,7 @@ class Kage:
         last_action_result = None
 
         for turn in range(max_turns):
-            llm_res = call_llm(messages=messages, system=KAGE_SYSTEM_PROMPT)
+            llm_res = call_llm(messages=messages, system=KAGE_SYSTEM_PROMPT, user_id=user_id)
             content = llm_res.get("content", "")
 
             action = extract_action_json(content)
@@ -278,7 +328,7 @@ class Kage:
             action_type = action.get("action", "")
             task_data = action.get("task", {})
 
-            last_action_result = self._execute_action_payload(action_type, task_data)
+            last_action_result = self._execute_action_payload(action_type, task_data, user_id=user_id)
 
             messages.append({"role": "assistant", "content": content})
             tool_output_str = json.dumps(last_action_result.get("output", last_action_result), default=str)
@@ -295,7 +345,6 @@ class Kage:
         }
 
     def _handle_features_command(self, args: dict) -> dict:
-        """Expose built-in feature execution via CLI."""
         feat = args.get("feature", "")
         action = args.get("action", "")
 
@@ -329,7 +378,6 @@ class Kage:
         return {"status": "error", "output": f"Unknown feature: {feat}"}
 
     def _handle_agent_command(self, args: dict) -> dict:
-        """Handle agent subcommands."""
         sub = args.get("subcmd", "list")
 
         if sub == "list":
@@ -372,7 +420,6 @@ class Kage:
         return {"status": "error", "output": f"Unknown agent subcommand: {sub}"}
 
     def _create_agent(self, name: str) -> dict:
-        """Scaffold a new agent."""
         agent_dir = self.agents_dir / name
         agent_dir.mkdir(parents=True, exist_ok=True)
 
@@ -428,7 +475,6 @@ class Agent:
         return {"status": "done", "output": f"Agent '{name}' created successfully at {agent_dir}"}
 
     def _handle_trace(self, args: dict) -> dict:
-        """Handle trace subcommands."""
         from core.memory import get_recent_traces, get_trace_by_id
 
         sub = args.get("subcmd", "list")
@@ -445,7 +491,6 @@ class Agent:
         return {"status": "error", "output": "Unknown trace subcommand"}
 
     def _handle_schedule(self, args: dict) -> dict:
-        """Handle schedule subcommands."""
         from core.memory import add_schedule, get_schedules, delete_schedule
 
         sub = args.get("subcmd", "list")
@@ -481,7 +526,6 @@ class Agent:
         return {"status": "error", "output": "Unknown schedule subcommand"}
 
     def _handle_status(self) -> dict:
-        """System status."""
         registry_path = self.agents_dir / "registry.json"
         agent_count = 0
         if registry_path.exists():
@@ -502,7 +546,7 @@ class Agent:
                 "agents_registered": agent_count,
                 "agents_loaded": loaded,
                 "agents_awake": awake,
-                "built_in_features": ["browser_use", "openhands_sandbox", "mcp_engine", "crewai_orchestrator"],
+                "built_in_features": ["browser_use", "openhands_sandbox", "mcp_engine", "crewai_orchestrator", "user_memory"],
                 "scheduled_jobs": scheduled_jobs,
                 "uptime": "running",
                 "kage_dir": str(KAGE_DIR),
@@ -510,7 +554,6 @@ class Agent:
         }
 
     def shutdown(self):
-        """Clean shutdown of scheduler and resources."""
         self.running = False
         if self.scheduler:
             self.scheduler.stop()
@@ -524,11 +567,17 @@ class Agent:
                 LOCK_FILE.unlink()
             except Exception:
                 pass
+        if TELEGRAM_PID_FILE.exists():
+            try:
+                pid = int(TELEGRAM_PID_FILE.read_text().strip())
+                os.kill(pid, signal.SIGTERM)
+                TELEGRAM_PID_FILE.unlink()
+            except Exception:
+                pass
         self.log("KAGE supervisor stopped cleanly")
 
 
 def is_socket_alive() -> bool:
-    """Check if existing daemon socket is alive and responding."""
     if not SOCKET_FILE.exists():
         return False
     try:
@@ -544,7 +593,6 @@ def is_socket_alive() -> bool:
 
 
 def send_to_daemon(command: str, args: dict) -> Optional[dict]:
-    """Send command to active daemon via Unix domain socket."""
     if not SOCKET_FILE.exists():
         return None
     try:
@@ -569,7 +617,6 @@ def send_to_daemon(command: str, args: dict) -> Optional[dict]:
 
 
 def run_ipc_server(kage: Kage):
-    """Run socket IPC server loop for daemon mode."""
     if SOCKET_FILE.exists():
         try:
             SOCKET_FILE.unlink()
@@ -624,7 +671,6 @@ def run_ipc_server(kage: Kage):
 
 
 def main():
-    """Main entry point — socket daemon or direct runner."""
     kage = Kage()
 
     def handle_shutdown(signum, frame):

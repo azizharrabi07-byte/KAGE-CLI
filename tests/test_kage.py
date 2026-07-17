@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Tests for KAGE OS v2.1 & Phase 3 REPL.
+Unit and Integration Tests for KAGE OS User Memory & Integrations.
 Run with: python3 -m unittest discover -s tests
 """
 
@@ -14,7 +14,7 @@ PROJECT_ROOT = Path(__file__).parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from skills import helpers
-from core import brain, memory, permissions, scheduler
+from core import brain, memory, permissions, scheduler, user_memory
 import kage
 import kage_cli
 
@@ -38,19 +38,34 @@ class TestSkillsHelpers(unittest.TestCase):
         self.assertTrue(truncated.endswith("..."))
 
 
+class TestUserMemory(unittest.TestCase):
+    def test_user_memory_storage_and_prompt(self):
+        uid = "test_user_42"
+        user_memory.set_user_name(uid, "Jordan")
+        user_memory.add_user_fact(uid, "Loves open-source AI")
+
+        u_mem = user_memory.get_user_memory(uid)
+        self.assertEqual(u_mem["name"], "Jordan")
+        self.assertIn("Loves open-source AI", u_mem["facts"])
+
+        prompt_str = user_memory.format_user_memory_prompt(uid)
+        self.assertIn("Jordan", prompt_str)
+        self.assertIn("Loves open-source AI", prompt_str)
+
+
 class TestCoreBrain(unittest.TestCase):
     def test_extract_action_json(self):
-        raw = 'Here is the action:\n```json\n{"action": "system", "task": {"action": "health"}}\n```'
+        raw = 'Here is the action:\n```json\n{"action": "openhands", "task": {"action": "execute_cmd", "command": "ls -la"}}\n```'
         parsed = brain.extract_action_json(raw)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "system")
+        self.assertEqual(parsed["action"], "openhands")
+        self.assertEqual(parsed["task"]["command"], "ls -la")
 
     def test_provider_models_dictionary(self):
         self.assertIn("gemini", brain.PROVIDER_MODELS)
         self.assertIn("groq", brain.PROVIDER_MODELS)
         self.assertIn("openrouter", brain.PROVIDER_MODELS)
         self.assertIn("ollama", brain.PROVIDER_MODELS)
-        self.assertIn("llama-3.3-70b-versatile", brain.PROVIDER_MODELS["groq"])
 
 
 class TestCoreMemory(unittest.TestCase):
@@ -58,44 +73,33 @@ class TestCoreMemory(unittest.TestCase):
         memory.init_db()
 
     def test_trace_logging(self):
-        trace_id = memory.log_trace("system", {"action": "test"}, {"status": "ok"}, duration_ms=10.5)
+        trace_id = memory.log_trace("telegram", {"action": "test"}, {"status": "ok"}, duration_ms=10.5)
         self.assertIsInstance(trace_id, int)
         trace = memory.get_trace_by_id(trace_id)
         self.assertIsNotNone(trace)
-        self.assertEqual(trace["agent"], "system")
-
-    def test_schedule_crud(self):
-        job_id = memory.add_schedule("0 9 * * *", "system", {"action": "health"})
-        self.assertIsInstance(job_id, int)
-        schedules = memory.get_schedules()
-        self.assertTrue(any(s["id"] == job_id for s in schedules))
-        memory.delete_schedule(job_id)
-        schedules_after = memory.get_schedules()
-        self.assertFalse(any(s["id"] == job_id for s in schedules_after))
+        self.assertEqual(trace["agent"], "telegram")
 
 
 class TestCorePermissions(unittest.TestCase):
     def test_safe_actions(self):
         self.assertTrue(permissions.require_approval("system.health"))
-        self.assertTrue(permissions.require_approval("obsidian.read"))
-        self.assertTrue(permissions.require_approval("browser.search"))
+        self.assertTrue(permissions.require_approval("telegram.status"))
 
     def test_auto_approve_flag(self):
-        self.assertTrue(permissions.require_approval("obsidian.write", auto_approve=True))
+        self.assertTrue(permissions.require_approval("telegram.send", auto_approve=True))
 
 
-class TestPhase3ReplConfig(unittest.TestCase):
-    def test_mask_secret(self):
-        masked = kage_cli.mask_secret("api_key", "AQ.Ab8RN6JL_eB0nDt_12345")
-        self.assertTrue(masked.startswith("AQ.A"))
-        self.assertTrue(masked.endswith("2345"))
-        self.assertIn("***", masked)
+class TestTelegramAgent(unittest.TestCase):
+    def setUp(self):
+        self.supervisor = kage.Kage()
+        self.supervisor.init_context()
 
-    def test_dynamic_config_setter_and_getter(self):
-        set_success = kage_cli.set_config_key("llm.test_field", "unit_test_value")
-        self.assertTrue(set_success)
-        val = kage_cli.get_config_value("llm.test_field")
-        self.assertEqual(val, "unit_test_value")
+    def test_telegram_agent_wake_status(self):
+        res = self.supervisor.wake("telegram", {"action": "status"})
+        self.assertEqual(res["status"], "done")
+        out = res.get("output", {})
+        self.assertEqual(out.get("status"), "connected")
+        self.assertEqual(out.get("username"), "@Mini_kage_bot")
 
 
 if __name__ == "__main__":

@@ -11,6 +11,7 @@ from typing import Dict
 SAFE_ACTIONS = {
     "system.health", "system.read", "memory.read", "memory.write",
     "obsidian.read", "obsidian.list_files", "obsidian.search",
+    "telegram.status", "telegram.read",
     "browser.search", "browser.fetch", "browser.read", "browser.extract_links",
     "mcp.list_servers", "mcp.list_tools", "mcp.list_resources", "mcp.read_resource",
     "openhands.status",
@@ -20,7 +21,8 @@ SAFE_ACTIONS = {
 
 # Actions that need approval
 SENSITIVE_ACTIONS = {
-    "whatsapp.send", "obsidian.write", "obsidian.append", "obsidian.delete",
+    "whatsapp.send", "telegram.send", "telegram.start",
+    "obsidian.write", "obsidian.append", "obsidian.delete",
     "mcp.call_tool", "openhands.execute_cmd", "openhands.run_python", "openhands.write_code",
     "meta.upgrade", "meta.pull", "system.delete", "system.install",
 }

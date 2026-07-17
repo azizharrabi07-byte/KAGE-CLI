@@ -1,10 +1,10 @@
-# KAGE OS — Production AI Operating System (Phases 6 & 7 Completed)
+# KAGE OS — Production AI Operating System (Phases 8 & 9 Completed)
 
-A modular, high-performance, local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Powered natively by **Google Gemini 2.5 Flash** with automated model fallbacks, **Production CLI Engine** (`core/cli/`), **Multi-Type Memory Engine** (`core/memory/`), **Modular Prompt Architecture** (`core/prompts/`), an **Extensible Agent Framework** (`core/agents/`), **Unified Integration Layer** (`core/integrations/`), persistent multi-step **Workflow Engine** (`core/workflows.py`), Telegram Bot integration (@Mini_kage_bot), Obsidian Local REST API, WhatsApp microservice bridge, phone health telemetry, and universal core OS features for **Browser-Use**, **OpenHands Sandbox**, **Awesome MCP Protocol**, and **CrewAI Orchestrator**.
+A modular, high-performance, local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Powered natively by **Google Gemini 2.5 Flash** with automated model fallbacks, **Hardened Security Framework** (`core/security/`), **Standardized Tool Architecture** (`core/tools/`), **Production CLI Engine** (`core/cli/`), **Multi-Type Memory Engine** (`core/memory/`), **Modular Prompt Architecture** (`core/prompts/`), an **Extensible Agent Framework** (`core/agents/`), **Unified Integration Layer** (`core/integrations/`), persistent multi-step **Workflow Engine** (`core/workflows.py`), Telegram Bot integration (@Mini_kage_bot), Obsidian Local REST API, WhatsApp microservice bridge, phone health telemetry, and universal core OS features for **Browser-Use**, **OpenHands Sandbox**, **Awesome MCP Protocol**, and **CrewAI Orchestrator**.
 
 ---
 
-## Architecture Overview (Phases 6 & 7)
+## Architecture Overview (Phases 8 & 9)
 
 ```text
 ┌───────────────────────────────────────────────────────────────────────────┐
@@ -20,38 +20,36 @@ A modular, high-performance, local terminal-based AI operating system designed f
       ┌──────────────────────────────┼──────────────────────────────┐
       │                              │                              │
 ┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐
-│ ADVANCED MEMORY ENGINE    │  │  EXTENSIBLE AGENT FRAMEWORK│  │ UNIFIED INTEGRATION LAYER │
-│     (core/memory/)        │  │      (core/agents/)        │  │    (core/integrations/)   │
+│ STANDARDIZED TOOL FRAMEWORK│  │ HARDENED SECURITY ENGINE │  │ UNIFIED INTEGRATION LAYER │
+│      (core/tools/)        │  │    (core/security/)       │  │    (core/integrations/)   │
 ├───────────────────────────┤  ├───────────────────────────┤  ├───────────────────────────┤
-│ • 5 Memory Types          │  │ • BaseAgent Interface     │  │ • AbstractBaseIntegration │
-│ • Vector Similarity Search│  │ • TaskAgent / ChatAgent   │  │ • ProviderRegistry        │
-│ • Importance Scoring (1-10│  │ • Tool / PlanningAgent    │  │ • RetryEngine / Limiter   │
-│ • TTL Expiration Cleanup  │  │ • Memory / ExecutionAgent │  │ • Dynamic PluginLoader    │
-│ • Memory Summarization    │  │ • AgentRunner Parallel Pool│  │ • 7 Production Providers  │
+│ • BaseTool Specification  │  │ • SafePathValidator       │  │ • AbstractBaseIntegration │
+│ • ToolMetadata & Schemas  │  │ • InputSanitizer          │  │ • ProviderRegistry        │
+│ • ToolResult Data Standard│  │ • SecretRedactor          │  │ • RetryEngine / Limiter   │
+│ • ToolRegistry Dispatcher │  │ • SecurityManager Policies│  │ • Dynamic PluginLoader    │
+│ • Bash/Python/File/Web    │  │ • Token Redaction Rules   │  │ • 7 Production Providers  │
 └───────────────────────────┘  └───────────────────────────┘  └───────────────────────────┘
 ```
 
 ---
 
-## Key Phase 6 & 7 Architectural Upgrades
+## Key Phase 8 & 9 Architectural Upgrades
 
-### 1. Phase 6 — Production CLI Engine (`core/cli/`)
-* **`TableFormatter`**: High-contrast border alignment for CLI data tables.
-* **`OutputFormatter`**: Renders responses in plain text, structured JSON (`--json`), or YAML (`--yaml`).
-* **`CLICompleter`**: Readline Tab-autocompletion for interactive slash commands, subcommands, and flags.
-* **`ConfigWizard`**: Interactive step-by-step setup guide for initial KAGE OS configuration.
-* **`CommandRunner` & `ExecutionFlags`**: Supports dry-run execution simulation (`--dry-run`), debug logging (`--debug`), and verbose output (`--verbose`).
+### 1. Phase 8 — Standardized Tool Framework (`core/tools/`)
+* **`BaseTool`**: Abstract contract requiring parameter schema validation, timeouts, retries, and structured logging (`ToolResult`).
+* **`PermissionLevel`**: Formal classification of tools into `SAFE`, `SENSITIVE`, and `CRITICAL`.
+* **`ToolRegistry`**: Central tool repository matching requests against metadata schemas.
+* **Standard Tool Library**:
+  * `BashTool` (`bash_execute`) — Parameterized sandboxed shell execution.
+  * `PythonTool` (`python_eval`) — Isolated inline Python script evaluation.
+  * `FileTool` (`file_ops`) — Safe workspace reading and writing with traversal checks.
+  * `WebTool` (`web_search`) — DuckDuckGo search and page text extraction.
+  * `MemoryTool` (`user_memory`) — Memory item search, fact storage, and recall.
 
-### 2. Phase 7 — Advanced Memory Engine (`core/memory/`)
-* **5 Standard Memory Types**:
-  1. `CONVERSATION` — Short-turn dialogue context.
-  2. `KNOWLEDGE` — Permanent user facts and domain rules.
-  3. `WORKING` — Active task execution buffer.
-  4. `EPISODIC` — Timestamped event records.
-  5. `SEMANTIC` — Vector-indexed memory documents.
-* **`SemanticIndex`**: Pure Python TF-IDF vectorizer and Cosine Similarity search index.
-* **Importance Scoring ($1.0..10.0$)**: Ranks memories by significance to prioritize context loading.
-* **TTL Expiration Engine**: Automatic background cleanup of temporary working memory records.
+### 2. Phase 9 — Hardened Security Framework (`core/security/`)
+* **`SafePathValidator`**: Resolves paths and enforces strict authorized workspace root boundaries (`/home/user/KAGE-CLI` or `~/.kage`), blocking directory traversal attacks (`../`).
+* **`SecretRedactor`**: Scans plain text logs, JSON payloads, exceptions, and stack traces for sensitive credentials (Gemini keys, Telegram tokens, Obsidian keys) and masks them automatically (`AQ.A***[REDACTED]***K2Tg`).
+* **`SecurityManager`**: Enforces system-wide authorization policies across CLI, IPC, and remote channels.
 
 ---
 
@@ -64,7 +62,7 @@ python3 kage_cli.py
 # 2. Start Background Daemon
 kage daemon start
 
-# 3. Interactive Terminal Shell
+# 3. Open Interactive Terminal Shell
 kage
 ```
 

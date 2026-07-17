@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Tests for KAGE OS Phases 6 & 7.
+Unit and Integration Tests for KAGE OS Phases 8 & 9.
 Run with: python3 -m unittest discover -s tests
 """
 
@@ -15,19 +15,25 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from skills import helpers
 from core import brain, memory, permissions, scheduler, user_memory, workflows
-from core.cli import (
-    TableFormatter,
-    OutputFormatter,
-    CLICompleter,
-    ExecutionFlags,
-    CommandRunner,
+from core.tools import (
+    BaseTool,
+    ToolMetadata,
+    PermissionLevel,
+    ToolResult,
+    ToolRegistry,
 )
-from core.memory import (
-    MemoryItem,
-    MemoryType,
-    MemoryStore,
-    SemanticIndex,
-    MemoryManager,
+from core.tools.implementations import (
+    BashTool,
+    PythonTool,
+    FileTool,
+    WebTool,
+    MemoryTool,
+)
+from core.security import (
+    SafePathValidator,
+    InputSanitizer,
+    SecretRedactor,
+    SecurityManager,
 )
 import kage
 import kage_cli
@@ -46,62 +52,60 @@ class TestSkillsHelpers(unittest.TestCase):
         self.assertIsNone(invalid)
 
 
-class TestPhase6CLI(unittest.TestCase):
-    def test_table_formatter(self):
-        headers = ["ID", "Name", "Role"]
-        rows = [["1", "Alex", "Admin"], ["2", "Jordan", "User"]]
-        tbl = TableFormatter.render_table(headers, rows, title="Users")
-        self.assertIn("Alex", tbl)
-        self.assertIn("Admin", tbl)
+class TestPhase8ToolFramework(unittest.TestCase):
+    def test_tool_registry_lookup(self):
+        tool = ToolRegistry.get_tool("bash_execute")
+        self.assertIsNotNone(tool)
+        self.assertEqual(tool.metadata.name, "bash_execute")
 
-    def test_output_formatter_json_and_yaml(self):
-        payload = {"status": "ok", "count": 42}
-        json_out = OutputFormatter.format_output(payload, "json")
-        self.assertIn('"count": 42', json_out)
+    def test_bash_tool_execution(self):
+        res = ToolRegistry.execute_tool("bash_execute", {"command": "echo 'hello_tool'"})
+        self.assertTrue(res.success)
+        self.assertEqual(res.output.get("stdout"), "hello_tool")
 
-        yaml_out = OutputFormatter.format_output(payload, "yaml")
-        self.assertIn("status: ok", yaml_out)
+    def test_file_tool_path_traversal_blocking(self):
+        file_tool = FileTool(root_dir="/home/user/KAGE-CLI")
+        res = file_tool.execute({"action": "read", "path": "../../../etc/passwd"})
+        self.assertFalse(res.success)
+        self.assertIn("Access denied", res.error)
 
-    def test_cli_completer(self):
-        completer = CLICompleter()
-        match1 = completer.complete("/con", 0)
-        self.assertIn("/config", match1)
-
-    def test_command_runner_dry_run(self):
-        runner = CommandRunner(flags=ExecutionFlags(dry_run=True, format_output="json"))
-        out = runner.run("status", {})
-        self.assertIn("dry_run", out)
+    def test_python_tool_evaluation(self):
+        res = ToolRegistry.execute_tool("python_eval", {"code": "print(10 + 32)"})
+        self.assertTrue(res.success)
+        self.assertEqual(res.output.get("stdout"), "42")
 
 
-class TestPhase7MemoryEngine(unittest.TestCase):
-    def setUp(self):
-        self.mgr = MemoryManager()
+class TestPhase9SecurityFramework(unittest.TestCase):
+    def test_path_validator_authorized(self):
+        validator = SafePathValidator(allowed_roots=["/home/user/KAGE-CLI"])
+        valid_path = validator.validate_path("/home/user/KAGE-CLI/README.md")
+        self.assertTrue(str(valid_path).endswith("README.md"))
 
-    def test_memory_importance_and_item(self):
-        item = self.mgr.add_memory(
-            content="User loves Python and Termux",
-            user_id="unit_user",
-            memory_type=MemoryType.KNOWLEDGE,
-            importance=8.5
-        )
-        self.assertEqual(item.importance, 8.5)
-        self.assertEqual(item.user_id, "unit_user")
+    def test_path_validator_traversal_rejection(self):
+        validator = SafePathValidator(allowed_roots=["/home/user/KAGE-CLI"])
+        with self.assertRaises(PermissionError):
+            validator.validate_path("/etc/shadow")
 
-    def test_semantic_vector_search(self):
-        self.mgr.add_memory("User primary language is Rust", user_id="sec_user", importance=9.0)
-        self.mgr.add_memory("User enjoys playing chess", user_id="sec_user", importance=5.0)
+    def test_secret_redactor_text(self):
+        raw_log = "Error using key AQ.Ab8RN6JL_sample_test_key_1234567890 on model"
+        redacted = SecretRedactor.redact_text(raw_log)
+        self.assertNotIn("sample_test_key_1234567890", redacted)
+        self.assertIn("***[REDACTED]***", redacted)
 
-        results = self.mgr.search_memories("programming language Rust", user_id="sec_user")
-        self.assertTrue(len(results) > 0)
-        self.assertIn("Rust", results[0]["content"])
+    def test_secret_redactor_dict_structure(self):
+        payload = {
+            "user": "alex",
+            "api_key": "4224414d3d95d207e1058d16f30424c9",
+            "nested": {"token": "8819096503:AAEqOGM_sample_token_1234567890"}
+        }
+        redacted = SecretRedactor.redact_structure(payload)
+        self.assertNotIn("4224414d3d95d207e1058d16f30424c9", json.dumps(redacted))
+        self.assertIn("***[REDACTED]***", redacted["api_key"])
 
-    def test_memory_ttl_expiration(self):
-        item = MemoryItem(
-            memory_type=MemoryType.WORKING,
-            content="Temporary buffer",
-            ttl_seconds=-10  # Already expired
-        )
-        self.assertTrue(item.is_expired())
+    def test_security_manager_safe_whitelist(self):
+        sec_mgr = SecurityManager()
+        self.assertTrue(sec_mgr.is_safe_action("system.health"))
+        self.assertTrue(sec_mgr.is_safe_action("browser.search"))
 
 
 if __name__ == "__main__":

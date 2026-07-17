@@ -1,7 +1,32 @@
+# Python
 __pycache__/
 *.pyc
-.kage.lock
-kage.db
-kage.log
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.db
+*.sqlite3
+*.log
+
+# Environment & Secrets
+.env
+config.toml
+secrets.toml
+*.key
+*.pem
+
+# Node.js (WhatsApp Bridge)
 node_modules/
-auth_info/
+npm-debug.log
+agents/whatsapp/bridge/auth_info/
+agents/whatsapp/bridge/session/
+*.tar.gz
+
+# OS junk
+.DS_Store
+Thumbs.db

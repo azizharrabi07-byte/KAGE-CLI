@@ -2,7 +2,7 @@
 """
 kage.py — Main daemon / supervisor loop & IPC server with multi-step ReAct agent feedback loop.
 Runs background thread pool, listens on Unix domain socket for CLI commands,
-hosts the background scheduler, and exposes built-in features (Browser-Use, OpenHands, MCP, CrewAI).
+hosts the background scheduler, and logs supervisor events to kage.log.
 """
 
 import json
@@ -21,9 +21,18 @@ KAGE_DIR = Path(__file__).parent
 KAGE_HOME = Path.home() / ".kage"
 KAGE_HOME.mkdir(parents=True, exist_ok=True)
 
+KAGE_OS_DIR = Path.home() / "kage-os"
+
 LOCK_FILE = KAGE_HOME / "kage.pid"
 SOCKET_FILE = KAGE_HOME / "kage.sock"
-LOG_FILE = KAGE_HOME / "kage.log"
+
+def resolve_log_file() -> Path:
+    """Resolve active log file path prioritizing ~/kage-os/kage.log, ~/.kage/kage.log, or local directory."""
+    if KAGE_OS_DIR.exists():
+        return KAGE_OS_DIR / "kage.log"
+    return KAGE_HOME / "kage.log"
+
+LOG_FILE = resolve_log_file()
 
 
 class Kage:
@@ -37,14 +46,26 @@ class Kage:
         self.scheduler = None
 
     def log(self, msg: str, level: str = "INFO"):
-        """Log to file."""
+        """Log structured timestamped messages to log files."""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         line = f"[{timestamp}] [{level}] {msg}"
-        try:
-            with open(LOG_FILE, "a", encoding="utf-8") as f:
-                f.write(line + "\n")
-        except Exception:
-            pass
+        
+        # Write to resolved log file
+        log_paths = [LOG_FILE, KAGE_HOME / "kage.log"]
+        if KAGE_OS_DIR.exists():
+            log_paths.append(KAGE_OS_DIR / "kage.log")
+
+        seen_paths = set()
+        for lp in log_paths:
+            if str(lp) in seen_paths:
+                continue
+            seen_paths.add(str(lp))
+            try:
+                lp.parent.mkdir(parents=True, exist_ok=True)
+                with open(lp, "a", encoding="utf-8") as f:
+                    f.write(line + "\n")
+            except Exception:
+                pass
 
     def init_context(self):
         """Initialize shared context (brain, memory, permissions, and core features)."""
@@ -247,7 +268,6 @@ class Kage:
 
             action = extract_action_json(content)
             if not action:
-                # No tool required or final answer produced
                 return {
                     "status": "done",
                     "input": message,
@@ -258,10 +278,8 @@ class Kage:
             action_type = action.get("action", "")
             task_data = action.get("task", {})
 
-            # Execute tool action
             last_action_result = self._execute_action_payload(action_type, task_data)
 
-            # Append assistant response and tool output observation to message history
             messages.append({"role": "assistant", "content": content})
             tool_output_str = json.dumps(last_action_result.get("output", last_action_result), default=str)
             messages.append({

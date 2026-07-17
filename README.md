@@ -1,117 +1,88 @@
-# KAGE OS v2.1 — Personal AI Agent Operating System for Termux
+# KAGE OS Phase 3 — Interactive REPL & Dynamic Config Engine
 
-A modular, high-performance, purely local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Powered natively by **Google Gemini 2.5 Flash** with automated model fallbacks, Obsidian Local REST API, WhatsApp microservice bridge, phone health telemetry, and universal core OS features for **Browser-Use**, **OpenHands Sandbox**, **Awesome MCP Protocol**, and **CrewAI Orchestrator**.
-
----
-
-## What's New in v2.1
-
-1. **`kage logs` Command**: Tail or real-time stream (`kage logs -f`) the daemon supervisor log.
-2. **`kage schedule list` Command**: Query and format scheduled cron jobs directly from `kage.db`.
-3. **`kage test whatsapp` Command**: End-to-end bridge connection and automated ping test against configured `test_number`.
-4. **Enhanced Security `.gitignore`**: Comprehensive protection for secrets (`config.toml`), WhatsApp session tokens (`auth_info/`), and SQLite databases.
-5. **Standardized Script Exit Codes**: All CLI commands return exit code `0` on success or `1` on error for automation scripts.
+A modular, high-performance local terminal-based AI operating system designed for **Termux (Android)** and Linux/macOS command-line environments. Phase 3 brings OpenCode-style interactive REPL shell with up-arrow history, slash commands (`/models`, `/providers`, `/config`), and live dynamic LLM switching across **Gemini**, **Groq**, **OpenRouter**, and **Ollama**.
 
 ---
 
-## Architecture Overview
+## What's New in Phase 3
+
+1. **Interactive REPL (`KAGE> ` Prompt)**:
+   - Launch by running `kage` or `kage interactive`.
+   - Up-arrow command history powered by Python's built-in `readline` (saved in `~/.kage/history`).
+2. **Slash Commands System**:
+   - `/help`: List all interactive commands.
+   - `/models`: Discover supported models for active provider (or `/models --all`).
+   - `/providers`: View active and standby LLM providers (`gemini`, `groq`, `openrouter`, `ollama`).
+   - `/config list`: Inspect full configuration with masked API keys.
+   - `/config get <key>`: View value for key e.g. `/config get llm.model`.
+   - `/config set <key> <val>`: Live update TOML configuration e.g. `/config set llm.provider groq`.
+3. **Dynamic LLM Engine Reload**:
+   - `core/brain.py` reloads `config.toml` dynamically on every request. Live provider switching without restarting daemons!
+4. **Enhanced Error Recovery & ANSI Styling**:
+   - High-contrast ANSI colors for status, warnings, and errors.
+   - Human-readable 429 rate limit notifications with suggested provider switching commands.
+
+---
+
+## Supported LLM Providers & Model Discovery
+
+| Provider | Base URL | Featured Models |
+| :--- | :--- | :--- |
+| **`gemini`** | `https://generativelanguage.googleapis.com` | `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-2.0-flash-lite` |
+| **`groq`** | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile`, `mixtral-8x7b-32768`, `gemma-2-9b-it` |
+| **`openrouter`** | `https://openrouter.ai/api/v1` | `anthropic/claude-3.5-sonnet`, `google/gemini-2.5-flash`, `mistralai/mistral-7b-instruct` |
+| **`ollama`** | `http://localhost:11434/v1` | Local models dynamically discovered via `ollama list` |
+
+---
+
+## Interactive REPL Shell Example
 
 ```text
-┌─────────────────────────────────────────────────────────────────────────┐
-│                    KAGE OS TERMINAL FRONTEND (kage_cli.py)               │
-│  kage (Interactive REPL) | kage chat | kage logs | kage schedule | kage test│
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │ Unix Domain Socket IPC (~/.kage/kage.sock)
-┌────────────────────────────────────▼────────────────────────────────────┐
-│                    SUPERVISOR DAEMON (kage.py)                          │
-└────────────────────────────────────┬────────────────────────────────────┘
-                                     │ Shared Context (self.context)
-      ┌──────────────────────────────┼──────────────────────────────┐
-      │                              │                              │
-┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐  ┌─────▼─────────────────────┐
-│  GEMINI 2.5 FLASH BRAIN   │  │   UNIVERSAL OS FEATURES   │  │   PERSONAL DOMAIN AGENTS  │
-│    (core/brain.py)        │  │     (core/features/)      │  │         (agents/)         │
-├───────────────────────────┤  ├───────────────────────────┤  ├───────────────────────────┤
-│ • Direct Google REST API  │  │ • browser (browser-use)   │  │ • obsidian (Port 27123)   │
-│ • Automated Model Failover│  │ • openhands (Code/Sandbox)│  │ • whatsapp (Port 3030)    │
-│ • ReAct Reasoning Loop    │  │ • mcp (Awesome MCP)       │  │ • system (Phone Hardware) │
-│                           │  │ • crew (CrewAI Teams)     │  │ • meta (Git Self-Upgrade) │
-└───────────────────────────┘  └───────────────────────────┘  └───────────────────────────┘
-```
+┌──────────────────────────────────────────────────────────────┐
+│  ███▄▄▄▄   ▄████████  ▄████████    ▄████████  ▄██████▄       │
+│  ███▀▀▀██▄ ███    ███ ███    ███   ███    ███ ███    ███     │
+│  ███   ███ ███    █▀  ███    █▀    ███    █▀  ███    █▀      │
+│  ███   ███ ███       ▄███▄▄▄      ▄███▄▄▄     ███    ███     │
+│  ███   ███ ███      ▀▀███▀▀▀     ▀▀███▀▀▀     ███    ███     │
+│  ███   ███ ███    █▄  ███    █▄    ███    █▄  ███    █▄      │
+│  ███   ███ ███    ███ ███    ███   ███    ███ ███    ███     │
+│   ▀█   █▀  ████████▀  ██████████   ██████████  ▀██████▀      │
+│                                                              │
+│  KAGE OS Phase 3 • OpenCode Terminal Shell for Termux        │
+│  Type /help for slash commands or enter prompt to chat.      │
+└──────────────────────────────────────────────────────────────┘
 
----
+KAGE> /providers
 
-## Installation & Termux Setup
+┌─── CONFIGURED PROVIDERS ───┐
+  • gemini       [ACTIVE]   (3 models)
+  • groq         [STANDBY]  (4 models)
+  • openrouter   [STANDBY]  (4 models)
+  • ollama       [STANDBY]  (4 models)
+└─────────────────────────────┘
 
-```bash
-# 1. Clone Repository
-git clone https://github.com/azizharrabi07-byte/KAGE-CLI.git
-cd KAGE-CLI
+KAGE> /config set llm.provider groq
+✓ Successfully set llm.provider = "groq"
+ℹ Provider switched to 'groq'. Brain will reload dynamically on next call.
 
-# 2. Run Setup Script
-bash setup.sh
-```
+KAGE> Search the web for OpenHands framework
+> {"action": "browser", "task": {"action": "search", "query": "OpenHands framework"}}
 
-### Configuration Setup (`~/.kage/config.toml`)
-
-```toml
-[llm]
-provider = "gemini"
-api_key = "YOUR_GEMINI_API_KEY"
-model = "gemini-2.5-flash"
-
-[obsidian]
-url = "http://localhost:27123"
-api_key = "4224414d3d95d207e1058d16f30424c9"
-vault = "KAGE"
-
-[whatsapp]
-test_number = "1234567890"
-
-[mcp]
-servers = [
-    { name = "fetch", url = "http://localhost:8000/mcp" },
-    { name = "filesystem", url = "http://localhost:8001/mcp" }
+[EXECUTION OUTPUT]
+[
+  {
+    "title": "www.openhands.dev",
+    "url": "https://www.openhands.dev/",
+    "snippet": "Meet OpenHands, the open-source platform for cloud coding agents..."
+  }
 ]
 ```
 
 ---
 
-## CLI Command Reference
-
-```bash
-# 1. Interactive REPL Session
-kage
-
-# 2. View Daemon Supervisor Logs
-kage logs                  # Show last 50 lines of kage.log
-kage logs --follow         # Stream logs in real-time
-
-# 3. Scheduled Tasks Management
-kage schedule list         # List scheduled cron jobs from kage.db
-kage schedule add --cron "0 9 * * *" --agent system --task '{"action":"health"}'
-kage schedule delete 1
-
-# 4. WhatsApp Bridge Verification Test
-kage test whatsapp         # Verify bridge & test ping message
-
-# 5. Direct AI Brain Prompts & Automation
-kage chat "Search the web for OpenHands framework"
-kage chat "Create a note in Obsidian titled Meeting.md"
-
-# 6. System Status & Health Telemetry
-kage status
-kage health
-
-# 7. Background Daemon Management
-kage daemon start
-kage daemon status
-kage daemon stop
-```
-
----
-
 ## Verification & Automated Test Suite
+
+Run unit and integration test suite:
 
 ```bash
 python3 -m unittest discover -s tests

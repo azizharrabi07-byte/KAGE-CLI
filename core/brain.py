@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-brain.py — LLM wrapper with support for Google Gemini API and OpenRouter/OpenAI compatible APIs.
-Includes automated fallback models for Gemini (2.5-flash -> 2.0-flash -> 2.0-flash-lite) and multi-turn message formatting.
+brain.py — Dynamic LLM Router supporting Google Gemini, Groq, OpenRouter, and Ollama.
+Reloads config dynamically on every call to support live provider and model switching.
 """
 
 import json
@@ -12,9 +12,17 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Any
 
+# Provider model directory
+PROVIDER_MODELS = {
+    "gemini": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    "groq": ["llama-3.3-70b-versatile", "mixtral-8x7b-32768", "gemma-2-9b-it", "llama3-70b-8192"],
+    "openrouter": ["anthropic/claude-3.5-sonnet", "google/gemini-2.5-flash", "mistralai/mistral-7b-instruct", "meta-llama/llama-3.3-70b-instruct"],
+    "ollama": ["llama3", "mistral", "qwen2.5", "phi3"]
+}
+
 
 def _load_config() -> Dict:
-    """Load config.toml — user config (~/.kage/config.toml) overrides repo config."""
+    """Reload config dynamically on every request from local config.toml and ~/.kage/config.toml."""
     config_paths = [
         Path(__file__).parent.parent / "config.toml",
         Path.home() / ".kage" / "config.toml",
@@ -102,28 +110,32 @@ def extract_action_json(content: str) -> Optional[Dict[str, Any]]:
 
 
 def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -> Dict:
-    """Call the LLM (Gemini with fallback or OpenRouter) and return response."""
+    """Call active provider LLM (Gemini, Groq, OpenRouter, or Ollama) with dynamic config loading."""
     config = _load_config()
     llm_config = config.get("llm", {})
 
-    provider = os.environ.get("LLM_PROVIDER") or llm_config.get("provider", "gemini").lower()
-    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or llm_config.get("api_key", "")
-    primary_model = os.environ.get("LLM_MODEL") or llm_config.get("model", "gemini-2.5-flash")
-    base_url = os.environ.get("LLM_BASE_URL") or llm_config.get("base_url", "https://openrouter.ai/api/v1")
+    provider = (os.environ.get("LLM_PROVIDER") or llm_config.get("provider", "gemini")).lower()
+    api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GROQ_API_KEY") or os.environ.get("OPENROUTER_API_KEY") or llm_config.get("api_key", "")
+    primary_model = os.environ.get("LLM_MODEL") or llm_config.get("model", "")
+    base_url = os.environ.get("LLM_BASE_URL") or llm_config.get("base_url", "")
 
-    if not api_key or api_key in ("YOUR_KEY_HERE", "YOUR_GEMINI_API_KEY_HERE"):
+    # Set default model per provider if unspecified
+    if not primary_model:
+        primary_model = PROVIDER_MODELS.get(provider, ["gemini-2.5-flash"])[0]
+
+    if not api_key and provider != "ollama" and api_key in ("", "YOUR_KEY_HERE", "YOUR_GEMINI_API_KEY_HERE"):
         last_msg = messages[-1]["content"] if messages else "no input"
         return {
             "role": "assistant",
-            "content": f"[ECHO MODE — no valid API key configured] Received: {last_msg}",
+            "content": f"[ECHO MODE — no valid API key configured for provider '{provider}'] Received: {last_msg}",
             "model": "echo",
         }
 
     import requests
 
-    # 1. Direct Gemini API Integration with Fallback Models
-    if provider in ("gemini", "google") or "gemini" in primary_model.lower():
-        fallback_models = [primary_model, "gemini-2.0-flash", "gemini-2.0-flash-lite"]
+    # 1. Google Gemini Provider
+    if provider in ("gemini", "google"):
+        fallback_models = [primary_model, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-2.0-flash-lite"]
         seen = set()
         models_to_try = [m for m in fallback_models if not (m in seen or seen.add(m))]
 
@@ -141,92 +153,123 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
 
                 payload = {
                     "contents": contents,
-                    "generationConfig": {
-                        "temperature": temperature,
-                    }
+                    "generationConfig": {"temperature": temperature}
                 }
 
                 if system:
-                    payload["systemInstruction"] = {
-                        "parts": [{"text": system}]
-                    }
+                    payload["systemInstruction"] = {"parts": [{"text": system}]}
 
-                resp = requests.post(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                    json=payload,
-                    timeout=60,
-                )
+                resp = requests.post(url, headers={"Content-Type": "application/json"}, json=payload, timeout=60)
 
                 if resp.status_code == 200:
                     data = resp.json()
                     candidates = data.get("candidates", [])
                     if candidates:
                         text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                        return {
-                            "role": "assistant",
-                            "content": text,
-                            "model": current_model,
-                        }
+                        return {"role": "assistant", "content": text, "model": current_model}
+
+                if resp.status_code == 429:
+                    last_err = f"⚠️ Gemini rate limit exceeded (429) on model '{current_model}'. Suggest switching provider e.g. '/config set llm.provider groq'."
+                    time.sleep(1)
+                    continue
 
                 err_data = resp.json() if resp.headers.get("content-type") == "application/json" else {}
                 err_msg = err_data.get("error", {}).get("message", resp.text)
                 last_err = f"[Gemini Error {resp.status_code} on {current_model}: {err_msg}]"
-
-                if resp.status_code in (503, 429):
-                    time.sleep(1)
-                    continue
-                else:
-                    break
 
             except Exception as e:
                 last_err = str(e)
                 time.sleep(1)
                 continue
 
-        return {
-            "role": "assistant",
-            "content": last_err or "[Gemini API failed on all model fallbacks]",
-            "model": primary_model,
-            "error": last_err,
-        }
+        return {"role": "assistant", "content": last_err or "[Gemini request failed]", "model": primary_model, "error": last_err}
 
-    # 2. OpenRouter / OpenAI-Compatible API Fallback
-    full_messages = []
-    if system:
-        full_messages.append({"role": "system", "content": system})
-    full_messages.extend(messages)
+    # 2. Groq Provider
+    elif provider == "groq":
+        endpoint = base_url or "https://api.groq.com/openai/v1"
+        full_messages = []
+        if system:
+            full_messages.append({"role": "system", "content": system})
+        full_messages.extend(messages)
 
-    try:
-        resp = requests.post(
-            f"{base_url.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
+        try:
+            resp = requests.post(
+                f"{endpoint.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"model": primary_model, "messages": full_messages, "temperature": temperature},
+                timeout=60,
+            )
+            if resp.status_code == 429:
+                return {
+                    "role": "assistant",
+                    "content": f"⚠️ Groq rate limit exceeded (429) on model '{primary_model}'. Try switching model e.g. '/config set llm.model llama-3.3-70b-versatile' or waiting.",
+                    "model": primary_model,
+                    "error": "rate_limit",
+                }
+            resp.raise_for_status()
+            data = resp.json()
+            choice = data["choices"][0]["message"]
+            return {"role": choice.get("role", "assistant"), "content": choice.get("content", ""), "model": data.get("model", primary_model)}
+        except Exception as e:
+            return {"role": "assistant", "content": f"[Groq LLM Error: {e}]", "model": primary_model, "error": str(e)}
+
+    # 3. Ollama Local Provider
+    elif provider == "ollama":
+        endpoint = base_url or "http://localhost:11434/v1"
+        full_messages = []
+        if system:
+            full_messages.append({"role": "system", "content": system})
+        full_messages.extend(messages)
+
+        try:
+            resp = requests.post(
+                f"{endpoint.rstrip('/')}/chat/completions",
+                headers={"Content-Type": "application/json"},
+                json={"model": primary_model, "messages": full_messages, "temperature": temperature},
+                timeout=60,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            choice = data["choices"][0]["message"]
+            return {"role": choice.get("role", "assistant"), "content": choice.get("content", ""), "model": data.get("model", primary_model)}
+        except requests.exceptions.ConnectionError:
+            return {
+                "role": "assistant",
+                "content": f"⚠️ Cannot connect to Ollama service at {endpoint}. Ensure Ollama is running ('ollama serve').",
                 "model": primary_model,
-                "messages": full_messages,
-                "temperature": temperature,
-            },
-            timeout=60,
-        )
-        resp.raise_for_status()
-        data = resp.json()
+                "error": "connection_error",
+            }
+        except Exception as e:
+            return {"role": "assistant", "content": f"[Ollama LLM Error: {e}]", "model": primary_model, "error": str(e)}
 
-        choice = data["choices"][0]["message"]
-        return {
-            "role": choice.get("role", "assistant"),
-            "content": choice.get("content", ""),
-            "model": data.get("model", primary_model),
-        }
-    except Exception as e:
-        return {
-            "role": "assistant",
-            "content": f"[LLM Error: {e}]",
-            "model": primary_model,
-            "error": str(e),
-        }
+    # 4. OpenRouter Provider (Default OpenRouter/OpenAI fallback)
+    else:
+        endpoint = base_url or "https://openrouter.ai/api/v1"
+        full_messages = []
+        if system:
+            full_messages.append({"role": "system", "content": system})
+        full_messages.extend(messages)
+
+        try:
+            resp = requests.post(
+                f"{endpoint.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"model": primary_model, "messages": full_messages, "temperature": temperature},
+                timeout=60,
+            )
+            if resp.status_code == 429:
+                return {
+                    "role": "assistant",
+                    "content": f"⚠️ OpenRouter rate limit exceeded (429) on model '{primary_model}'. Switch provider or check quota.",
+                    "model": primary_model,
+                    "error": "rate_limit",
+                }
+            resp.raise_for_status()
+            data = resp.json()
+            choice = data["choices"][0]["message"]
+            return {"role": choice.get("role", "assistant"), "content": choice.get("content", ""), "model": data.get("model", primary_model)}
+        except Exception as e:
+            return {"role": "assistant", "content": f"[LLM Error: {e}]", "model": primary_model, "error": str(e)}
 
 
 KAGE_SYSTEM_PROMPT = """You are Kage — a unified personal AI operating system running on the user's phone.

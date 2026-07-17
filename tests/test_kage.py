@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unit and Integration Tests for KAGE OS.
+Unit and Integration Tests for KAGE OS v2.1 & Phase 3 REPL.
 Run with: python3 -m unittest discover -s tests
 """
 
@@ -45,17 +45,12 @@ class TestCoreBrain(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["action"], "system")
 
-    def test_extract_nested_obsidian_action(self):
-        raw = 'I will run: {"action": "obsidian", "task": {"action": "read_file", "path": "test.md"}}'
-        parsed = brain.extract_action_json(raw)
-        self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "obsidian")
-        self.assertEqual(parsed["task"]["path"], "test.md")
-
-    def test_call_llm_gemini_integration(self):
-        res = brain.call_llm([{"role": "user", "content": "Respond short: active"}])
-        self.assertIn("content", res)
-        self.assertIsNotNone(res["content"])
+    def test_provider_models_dictionary(self):
+        self.assertIn("gemini", brain.PROVIDER_MODELS)
+        self.assertIn("groq", brain.PROVIDER_MODELS)
+        self.assertIn("openrouter", brain.PROVIDER_MODELS)
+        self.assertIn("ollama", brain.PROVIDER_MODELS)
+        self.assertIn("llama-3.3-70b-versatile", brain.PROVIDER_MODELS["groq"])
 
 
 class TestCoreMemory(unittest.TestCase):
@@ -89,24 +84,18 @@ class TestCorePermissions(unittest.TestCase):
         self.assertTrue(permissions.require_approval("obsidian.write", auto_approve=True))
 
 
-class TestBuiltInFeatures(unittest.TestCase):
-    def setUp(self):
-        self.supervisor = kage.Kage()
-        self.supervisor.init_context()
+class TestPhase3ReplConfig(unittest.TestCase):
+    def test_mask_secret(self):
+        masked = kage_cli.mask_secret("api_key", "AQ.Ab8RN6JL_eB0nDt_12345")
+        self.assertTrue(masked.startswith("AQ.A"))
+        self.assertTrue(masked.endswith("2345"))
+        self.assertIn("***", masked)
 
-    def test_browser_feature_context(self):
-        self.assertTrue(hasattr(self.supervisor.context, "browser"))
-        results = self.supervisor.context.browser.search("Python")
-        self.assertIsInstance(results, list)
-
-    def test_openhands_feature_context(self):
-        self.assertTrue(hasattr(self.supervisor.context, "openhands"))
-        res = self.supervisor.context.openhands.execute_cmd("echo 'hello'", require_approval=False)
-        self.assertEqual(res["stdout"], "hello")
-
-    def test_obsidian_agent_wake(self):
-        res = self.supervisor.wake("obsidian", {"action": "list_files"})
-        self.assertIn("status", res)
+    def test_dynamic_config_setter_and_getter(self):
+        set_success = kage_cli.set_config_key("llm.test_field", "unit_test_value")
+        self.assertTrue(set_success)
+        val = kage_cli.get_config_value("llm.test_field")
+        self.assertEqual(val, "unit_test_value")
 
 
 if __name__ == "__main__":

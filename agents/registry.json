@@ -23,10 +23,5 @@
         "path": "meta",
         "timeout": 60,
         "description": "Self-upgrade via git pull"
-    },
-    "tester": {
-        "path": "tester",
-        "timeout": 30,
-        "description": "Custom agent: tester"
     }
 }

@@ -1,25 +1,26 @@
 #!/usr/bin/env python3
 """
-kage_cli.py — Minimalist Black & White OpenCode-Style CLI for KAGE OS.
+kage_cli.py — Pure Terminal CLI & Interactive REPL Shell for KAGE OS in Termux.
+OpenCode / OpenClaude Minimalist Black & White Style.
+No local web servers or external browser apps needed.
 
 Usage:
+  kage                         (Start interactive terminal REPL)
+  kage interactive             (Start interactive terminal REPL)
   kage chat "message"
-  kage web [--port 8080]
+  kage status
+  kage health
   kage agent list
   kage agent wake <name> --task '{"key":"val"}'
-  kage agent create <name>
   kage trace list
-  kage trace show <id>
-  kage health
-  kage schedule add --cron "0 9 * * *" --agent system --task '{"action":"health"}'
   kage schedule list
-  kage schedule delete <job_id>
   kage daemon start|stop|status
 """
 
 import argparse
 import json
 import os
+import readline
 import socket
 import subprocess
 import sys
@@ -29,6 +30,20 @@ from pathlib import Path
 KAGE_DIR = Path(__file__).parent
 PYTHON = sys.executable
 SOCKET_FILE = Path.home() / ".kage" / "kage.sock"
+
+ASCII_BANNER = """┌──────────────────────────────────────────────────────────────┐
+│  ███▄▄▄▄   ▄████████  ▄████████    ▄████████  ▄██████▄       │
+│  ███▀▀▀██▄ ███    ███ ███    ███   ███    ███ ███    ███     │
+│  ███   ███ ███    █▀  ███    █▀    ███    █▀  ███    ███     │
+│  ███   ███ ███       ▄███▄▄▄      ▄███▄▄▄     ███    ███     │
+│  ███   ███ ███      ▀▀███▀▀▀     ▀▀███▀▀▀     ███    ███     │
+│  ███   ███ ███    █▄  ███    █▄    ███    █▄  ███    ███     │
+│  ███   ███ ███    ███ ███    ███   ███    ███ ███    ███     │
+│   ▀█   █▀  ████████▀  ██████████   ██████████  ▀██████▀      │
+│                                                              │
+│  KAGE OS v2.0 • Terminal AI Operating System for Termux      │
+│  Type /help for slash commands or enter prompt to chat.      │
+└──────────────────────────────────────────────────────────────┘"""
 
 
 def run_kage(command: str, args: dict = None) -> dict:
@@ -79,7 +94,8 @@ def run_kage(command: str, args: dict = None) -> dict:
 
 def cmd_chat(args):
     """Chat with Kage."""
-    result = run_kage("chat", {"message": args.message})
+    msg = args.message if hasattr(args, "message") else str(args)
+    result = run_kage("chat", {"message": msg})
 
     if result.get("status") == "done":
         if "response" in result:
@@ -90,22 +106,64 @@ def cmd_chat(args):
             agent_result = result["agent_result"]
             if agent_result.get("status") == "done":
                 output = agent_result.get("output", {})
-                print(f"\n[AGENT OUTPUT]")
+                print(f"\n[EXECUTION OUTPUT]")
                 if isinstance(output, (dict, list)):
                     print(json.dumps(output, indent=2, default=str))
                 else:
                     print(output)
             else:
-                print(f"\n[AGENT ERROR]: {agent_result.get('output', 'unknown')}")
+                print(f"\n[EXECUTION ERROR]: {agent_result.get('output', 'unknown')}")
     else:
         print(f"Error: {result.get('output', 'unknown')}")
 
 
-def cmd_web(args):
-    """Start KAGE OS OpenCode-Style Web Landing Page & Dashboard."""
-    port = getattr(args, "port", 8080)
-    print(f"[OPENCODE DASHBOARD] Running on http://localhost:{port}")
-    subprocess.run([PYTHON, str(KAGE_DIR / "core" / "web_ui.py"), str(port)], cwd=str(KAGE_DIR))
+def cmd_status(args=None):
+    """System status."""
+    result = run_kage("status")
+    if result.get("status") == "done":
+        output = result.get("output", {})
+        print("\n┌─── SYSTEM STATUS ───┐")
+        print(f"│ Agents Registered: {output.get('agents_registered', 0)}")
+        print(f"│ Features Active:   Browser, OpenHands, MCP, CrewAI")
+        print(f"│ Scheduled Jobs:    {output.get('scheduled_jobs', 0)}")
+        print(f"│ Daemon Socket:     {'ONLINE' if SOCKET_FILE.exists() else 'STANDBY'}")
+        print(f"│ Workspace Dir:     {output.get('kage_dir', '?')}")
+        print("└─────────────────────┘")
+    else:
+        print(f"Error: {result.get('output')}")
+
+
+def cmd_health(args=None):
+    """Check phone health."""
+    result = run_kage("health")
+    if result.get("status") == "done":
+        output = result.get("output", {})
+        print("\n┌─── SYSTEM TELEMETRY ───┐")
+        if "battery" in output:
+            bat = output["battery"]
+            if isinstance(bat, dict):
+                if "percentage" in bat:
+                    print(f"│ Battery:  {bat['percentage']}% ({bat.get('status', 'unknown')})")
+                elif "error" in bat:
+                    print(f"│ Battery:  {bat['error']}")
+        if "storage" in output:
+            stor = output["storage"]
+            if isinstance(stor, dict) and "total" in stor:
+                print(f"│ Storage:  {stor['used']} / {stor['total']} ({stor.get('use_percent', '?')})")
+            elif isinstance(stor, dict) and "error" in stor:
+                print(f"│ Storage:  {stor['error']}")
+        if "uptime" in output:
+            print(f"│ Uptime:   {output['uptime']}")
+        if "cpu" in output:
+            cpu = output["cpu"]
+            if isinstance(cpu, dict):
+                if "raw" in cpu:
+                    print(f"│ CPU Load: {cpu['raw'][:80]}")
+                elif "load_average" in cpu:
+                    print(f"│ CPU Load: {cpu['load_average']}")
+        print("└────────────────────────┘")
+    else:
+        print(f"Error: {result.get('output')}")
 
 
 def cmd_agent(args):
@@ -150,7 +208,8 @@ def cmd_trace(args):
     sub = getattr(args, "subcmd", "list") or "list"
 
     if sub == "list":
-        result = run_kage("trace", {"subcmd": "list", "limit": args.limit})
+        limit = getattr(args, "limit", 20) or 20
+        result = run_kage("trace", {"subcmd": "list", "limit": limit})
         if result.get("status") == "done":
             traces = result.get("output", [])
             if not traces:
@@ -177,39 +236,6 @@ def cmd_trace(args):
                 print(f"Trace {args.trace_id} not found")
         else:
             print(f"Error: {result.get('output')}")
-
-
-def cmd_health(args):
-    """Check phone health."""
-    result = run_kage("health")
-    if result.get("status") == "done":
-        output = result.get("output", {})
-        print("\n┌─── SYSTEM TELEMETRY ───┐")
-        if "battery" in output:
-            bat = output["battery"]
-            if isinstance(bat, dict):
-                if "percentage" in bat:
-                    print(f"│ Battery:  {bat['percentage']}% ({bat.get('status', 'unknown')})")
-                elif "error" in bat:
-                    print(f"│ Battery:  {bat['error']}")
-        if "storage" in output:
-            stor = output["storage"]
-            if isinstance(stor, dict) and "total" in stor:
-                print(f"│ Storage:  {stor['used']} / {stor['total']} ({stor.get('use_percent', '?')})")
-            elif isinstance(stor, dict) and "error" in stor:
-                print(f"│ Storage:  {stor['error']}")
-        if "uptime" in output:
-            print(f"│ Uptime:   {output['uptime']}")
-        if "cpu" in output:
-            cpu = output["cpu"]
-            if isinstance(cpu, dict):
-                if "raw" in cpu:
-                    print(f"│ CPU Load: {cpu['raw'][:80]}")
-                elif "load_average" in cpu:
-                    print(f"│ CPU Load: {cpu['load_average']}")
-        print("└────────────────────────┘")
-    else:
-        print(f"Error: {result.get('output')}")
 
 
 def cmd_schedule(args):
@@ -252,23 +278,6 @@ def cmd_schedule(args):
         print(result.get("output", result))
 
 
-def cmd_status(args):
-    """System status."""
-    result = run_kage("status")
-    if result.get("status") == "done":
-        output = result.get("output", {})
-        print("\n┌─── SYSTEM STATUS ───┐")
-        print(f"│ Agents Registered: {output.get('agents_registered', 0)}")
-        print(f"│ Agents Loaded:     {output.get('agents_loaded', 0)}")
-        print(f"│ Agents Awake:      {output.get('agents_awake', 0)}")
-        print(f"│ Scheduled Jobs:    {output.get('scheduled_jobs', 0)}")
-        print(f"│ Daemon Socket:     {'ONLINE' if SOCKET_FILE.exists() else 'OFFLINE'}")
-        print(f"│ Directory:         {output.get('kage_dir', '?')}")
-        print("└─────────────────────┘")
-    else:
-        print(f"Error: {result.get('output')}")
-
-
 def cmd_daemon(args):
     """Manage supervisor daemon process."""
     sub = getattr(args, "action", "status") or "status"
@@ -304,25 +313,79 @@ def cmd_daemon(args):
             print("[DAEMON] Not running. Use 'kage daemon start' to activate service.")
 
 
+def start_interactive_repl():
+    """Start continuous interactive Terminal REPL shell for Termux (OpenCode Style)."""
+    print(ASCII_BANNER)
+    print("")
+
+    while True:
+        try:
+            line = input("kage> ").strip()
+            if not line:
+                continue
+
+            if line in ("/exit", "/quit", "exit", "quit"):
+                print("\n[KAGE OS] Exiting interactive session. Goodbye.")
+                break
+
+            elif line == "/help":
+                print("""
+┌─── KAGE OS INTERACTIVE COMMANDS ───┐
+│  /status    - System status & daemon state
+│  /health    - Check battery, storage, CPU, uptime
+│  /agents    - List registered personal domain agents
+│  /traces    - List recent trace execution logs
+│  /schedules - List active cron schedules
+│  /clear     - Clear terminal screen
+│  /exit      - Exit interactive session
+│  <prompt>   - Chat directly with Kage Gemini AI Brain
+└────────────────────────────────────┘""")
+
+            elif line == "/status":
+                cmd_status()
+
+            elif line == "/health":
+                cmd_health()
+
+            elif line == "/agents":
+                cmd_agent(argparse.Namespace(subcmd="list"))
+
+            elif line == "/traces":
+                cmd_trace(argparse.Namespace(subcmd="list", limit=10))
+
+            elif line == "/schedules":
+                cmd_schedule(argparse.Namespace(subcmd="list"))
+
+            elif line == "/clear":
+                os.system("clear" if os.name != "nt" else "cls")
+                print(ASCII_BANNER)
+
+            else:
+                cmd_chat(line)
+
+        except (KeyboardInterrupt, EOFError):
+            print("\n\n[KAGE OS] Exiting interactive shell.")
+            break
+
+
 def main():
     parser = argparse.ArgumentParser(
         prog="kage",
-        description="KAGE OS — OpenCode-Style Personal AI Operating System",
+        description="KAGE OS — Terminal AI Operating System for Termux",
     )
     subparsers = parser.add_subparsers(dest="command")
+
+    # interactive
+    subparsers.add_parser("interactive", help="Start OpenCode-style interactive terminal shell")
 
     # chat
     p_chat = subparsers.add_parser("chat", help="Chat with Kage LLM brain")
     p_chat.add_argument("message", help="Message or instruction")
 
-    # web
-    p_web = subparsers.add_parser("web", help="Start OpenCode-style Web Dashboard")
-    p_web.add_argument("--port", type=int, default=8080, help="Port (default: 8080)")
-
     # agent
     p_agent = subparsers.add_parser("agent", help="Agent management")
     agent_sub = p_agent.add_subparsers(dest="subcmd")
-    agent_sub.add_parser("list", help="List all registered agents")
+    agent_sub.add_parser("list", help="List all registered domain agents")
     p_aw = agent_sub.add_parser("wake", help="Wake an agent with task")
     p_aw.add_argument("name", help="Agent name")
     p_aw.add_argument("--task", default="{}", help="JSON task object")
@@ -360,18 +423,18 @@ def main():
 
     args = parser.parse_args()
 
-    if not args.command:
-        parser.print_help()
+    # If no command supplied, start interactive terminal REPL shell!
+    if not args.command or args.command == "interactive":
+        start_interactive_repl()
         return
 
     dispatch = {
         "chat": cmd_chat,
-        "web": cmd_web,
         "agent": cmd_agent,
         "trace": cmd_trace,
         "health": cmd_health,
         "schedule": cmd_schedule,
-        "status": cmd_status,
+        "status": lambda a: cmd_status(a),
         "daemon": cmd_daemon,
     }
 

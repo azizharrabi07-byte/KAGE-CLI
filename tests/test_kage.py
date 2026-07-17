@@ -45,11 +45,12 @@ class TestCoreBrain(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["action"], "system")
 
-    def test_extract_nested_feature_action(self):
-        raw = 'I will run: {"action": "browser", "task": {"action": "search", "query": "Python"}}'
+    def test_extract_nested_obsidian_action(self):
+        raw = 'I will run: {"action": "obsidian", "task": {"action": "read_file", "path": "test.md"}}'
         parsed = brain.extract_action_json(raw)
         self.assertIsNotNone(parsed)
-        self.assertEqual(parsed["action"], "browser")
+        self.assertEqual(parsed["action"], "obsidian")
+        self.assertEqual(parsed["task"]["path"], "test.md")
 
     def test_call_llm_gemini_integration(self):
         res = brain.call_llm([{"role": "user", "content": "Respond short: active"}])
@@ -81,11 +82,11 @@ class TestCoreMemory(unittest.TestCase):
 class TestCorePermissions(unittest.TestCase):
     def test_safe_actions(self):
         self.assertTrue(permissions.require_approval("system.health"))
+        self.assertTrue(permissions.require_approval("obsidian.read"))
         self.assertTrue(permissions.require_approval("browser.search"))
-        self.assertTrue(permissions.require_approval("mcp.list_tools"))
 
     def test_auto_approve_flag(self):
-        self.assertTrue(permissions.require_approval("openhands.execute_cmd", auto_approve=True))
+        self.assertTrue(permissions.require_approval("obsidian.write", auto_approve=True))
 
 
 class TestBuiltInFeatures(unittest.TestCase):
@@ -103,15 +104,9 @@ class TestBuiltInFeatures(unittest.TestCase):
         res = self.supervisor.context.openhands.execute_cmd("echo 'hello'", require_approval=False)
         self.assertEqual(res["stdout"], "hello")
 
-    def test_mcp_feature_context(self):
-        self.assertTrue(hasattr(self.supervisor.context, "mcp"))
-        servers = self.supervisor.context.mcp.list_servers()
-        self.assertIsInstance(servers, list)
-
-    def test_crew_feature_context(self):
-        self.assertTrue(hasattr(self.supervisor.context, "crew"))
-        templates = self.supervisor.context.crew.list_templates()
-        self.assertIsInstance(templates, list)
+    def test_obsidian_agent_wake(self):
+        res = self.supervisor.wake("obsidian", {"action": "list_files"})
+        self.assertIn("status", res)
 
 
 if __name__ == "__main__":

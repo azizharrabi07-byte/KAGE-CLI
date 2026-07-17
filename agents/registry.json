@@ -4,10 +4,10 @@
         "timeout": 30,
         "description": "Send and read WhatsApp messages via Baileys bridge"
     },
-    "trilium": {
-        "path": "trilium",
+    "obsidian": {
+        "path": "obsidian",
         "timeout": 15,
-        "description": "Read/write notes via Trilium / TriliumDroid ETapi"
+        "description": "Read/write notes via Obsidian Local REST API"
     },
     "system": {
         "path": "system",

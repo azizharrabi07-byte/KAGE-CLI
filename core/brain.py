@@ -173,7 +173,6 @@ def call_llm(messages: List[Dict], system: str = "", temperature: float = 0.7) -
                 err_msg = err_data.get("error", {}).get("message", resp.text)
                 last_err = f"[Gemini Error {resp.status_code} on {current_model}: {err_msg}]"
 
-                # If 503 or 429, wait briefly and try next model fallback
                 if resp.status_code in (503, 429):
                     time.sleep(1)
                     continue
@@ -241,7 +240,7 @@ CORE FEATURES:
 
 DOMAIN AGENTS:
 - whatsapp: Send/read WhatsApp messages (action: "whatsapp", task: {"action": "send"|"read", "to": "...", "text": "..."})
-- trilium: Read/write Trilium Notes (action: "trilium", task: {"action": "read_note"|"write_note"|"list_notes", "title": "...", "content": "..."})
+- obsidian: Read/write Obsidian notes via Local REST API (action: "obsidian", task: {"action": "read_file"|"write_file"|"list_files"|"search", "path": "...", "content": "..."})
 - system: Check phone health, battery, storage, CPU (action: "system", task: {})
 - meta: Self-upgrade via git pull (action: "meta", task: {"action": "check"|"pull"})
 

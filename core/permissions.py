@@ -10,7 +10,7 @@ from typing import Dict
 # Actions that are safe (auto-approve)
 SAFE_ACTIONS = {
     "system.health", "system.read", "memory.read", "memory.write",
-    "trilium.read", "trilium.list_notes", "trilium.search",
+    "obsidian.read", "obsidian.list_files", "obsidian.search",
     "browser.search", "browser.fetch", "browser.read", "browser.extract_links",
     "mcp.list_servers", "mcp.list_tools", "mcp.list_resources", "mcp.read_resource",
     "openhands.status",
@@ -20,7 +20,7 @@ SAFE_ACTIONS = {
 
 # Actions that need approval
 SENSITIVE_ACTIONS = {
-    "whatsapp.send", "trilium.write_note", "trilium.append_note", "trilium.delete",
+    "whatsapp.send", "obsidian.write", "obsidian.append", "obsidian.delete",
     "mcp.call_tool", "openhands.execute_cmd", "openhands.run_python", "openhands.write_code",
     "meta.upgrade", "meta.pull", "system.delete", "system.install",
 }

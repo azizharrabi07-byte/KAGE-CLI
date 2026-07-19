@@ -1,0 +1,13 @@
+name: summarizer
+version: 1.0.0
+agent_class: SummarizerAgent
+description: Condenses long text into concise bullet summaries.
+emoji: 📝
+tools:
+  - memory.recall
+  - search.web
+keywords:
+  - summarize
+  - summary
+  - tl;dr
+  - condense

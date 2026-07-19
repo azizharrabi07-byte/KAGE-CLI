@@ -1,3 +1,39 @@
+## [3.0.0] — master architecture (modular, plugin-based, event-driven OS)
+
+KAGE is redesigned as an AI Operating System where intelligence emerges from
+orchestration. **Fully additive** — every prior test still passes.
+
+### New architectural pillars
+- **Orchestrator** (`core/orchestrator.py`) — the always-on conductor: plan →
+  select agents on demand → execute → merge → store memory → terminate.
+- **Event Bus** (`core/events.py`) — hierarchical pub/sub; agents never call
+  each other directly.
+- **Tool Manager** (`core/tool_manager.py`) — single gateway to filesystem/git/
+  terminal/browser/memory/search; agents never touch tools directly.
+- **Memory Service** (`core/memory_service.py`) — 5 layers (session/project/
+  user/knowledge/longterm) behind one shared interface.
+- **Planner** (`core/planner.py`) — decomposes goals into execution plans.
+- **Plugin System** (`core/plugins.py`) — auto-discovers `manifest.yaml` plugins.
+
+### Flagship: Harness Agent (`agents/harness/`)
+Continuous improvement — evaluate, benchmark (latency/p95/variance → weighted
+health score), compare baseline vs candidate, and propose upgrades **without
+deploying them** (always `requires_approval`).
+
+### Bridge Agents (`agents/bridge/`)
+- `BridgeAgent` base + **OpenCode** and **OpenClaw** bridges.
+- Thin adapters over external systems; graceful degradation when absent.
+- KAGE builds bridges, never clones.
+
+### Sample plugin (`kage/plugins/summarizer/`)
+Full plugin layout: manifest.yaml, system_prompt.md, agent.py, workflow.py,
+tools.py, tests/, docs/.
+
+### Docs, tests, benchmarks
+- `docs/ARCHITECTURE_V2.md`, `docs/MIGRATION.md`.
+- `benchmarks/run_benchmarks.py` — per-subsystem latency/health baselines.
+- `kage/tests/test_v2_architecture.py` (52 tests). Full suite: 284 assertions.
+
 ## [2.1.0] — supervisor now ACTS (shell, file edit, create_agent)
 
 Kage is no longer reply-only. The supervisor parses action blocks from the LLM

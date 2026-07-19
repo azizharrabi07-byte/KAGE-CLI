@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main, supervisor-discord, arena-handoff]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r kage/requirements.txt
+          pip install -e ./kage
+
+      - name: Lint (compile all)
+        run: python -m compileall -q kage
+
+      - name: Type/syntax sanity import
+        run: |
+          python -c "import kage; print('kage', kage.__version__)"
+          python -c "from kage.core.supervisor import Supervisor, detect_intent; print('supervisor ok')"
+
+      - name: Run tests
+        run: |
+          python kage/tests/test_supervisor.py
+          python kage/tests/test_tools.py

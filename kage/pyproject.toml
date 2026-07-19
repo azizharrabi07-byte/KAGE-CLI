@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kage-os"
+version = "0.1.0"
+description = "KAGE OS — a personal AI operating system for the terminal (Termux). CLI + multi-agent supervisor + Discord."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "KAGE OS" }]
+dependencies = [
+    "discord.py>=2.3.2",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+telegram = ["python-telegram-bot>=20.6"]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+# Installs the `kage` command.
+kage = "kage.kage:main"
+
+[tool.setuptools.packages.find]
+include = ["kage*"]
+
+[tool.pytest.ini_options]
+testpaths = ["kage/tests"]

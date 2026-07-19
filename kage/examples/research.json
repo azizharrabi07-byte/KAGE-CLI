@@ -1,0 +1,26 @@
+# KAGE OS example workflow — deep research with a conditional step.
+# Run:  kage workflow run examples/research.json
+{
+  "name": "ai-news-research",
+  "steps": [
+    {
+      "id": "search",
+      "action": "tool",
+      "args": { "name": "web.search", "args": { "query": "latest AI news 2026", "limit": 5 } },
+      "retries": 2
+    },
+    {
+      "id": "summarize",
+      "action": "think",
+      "args": { "message": "summarize the search results about AI news" },
+      "depends_on": ["search"],
+      "when": "search.ok"
+    },
+    {
+      "id": "fallback",
+      "action": "think",
+      "args": { "message": "search failed; explain limitations" },
+      "depends_on": ["search"]
+    }
+  ]
+}

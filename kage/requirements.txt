@@ -1,0 +1,16 @@
+# KAGE OS — Python runtime dependencies.
+# Discord is the PRIMARY interface.
+discord.py>=2.3.2
+
+# Loads secrets from .env (optional but recommended).
+python-dotenv>=1.0.0
+
+# --- Optional providers (wire for live capabilities) ---
+# openai>=1.0.0                      # LLM for chat/research (Sage/Kage)
+# google-search-results>=2.4         # live web search (Whiz)
+
+# --- Optional / deprecated transport (only with --use-telegram) ---
+python-telegram-bot>=20.6
+
+# --- Dev / test ---
+pytest>=8.0

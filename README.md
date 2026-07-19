@@ -2,6 +2,21 @@
 
 A decisive, intelligent AI OS inspired by Hermes, OpenCode, OpenClaw, and OpenClaude.
 
+> ## ✨ New: Supervisor + Discord (`supervisor-discord` branch)
+> The `kage/` package adds a **supervisor daemon + multi-agent core + Discord
+> (primary interface)** on top of this foundation. Your existing `core/brain.py`,
+> memory, sessions, and Telegram bot are untouched.
+>
+> ```bash
+> pip install -e ./kage && pip install -r requirements.txt
+> kage chat "remember my name is Daddy"
+> kage run --interface discord   # primary UI
+> ```
+>
+> 👉 Full details: **[`kage/SUPERVISOR.md`](kage/SUPERVISOR.md)**
+>
+> Discord is now primary; Telegram is optional/deprecated.
+
 ## Features
 
 - Layered prompt system (Hermes‑style: SOUL → AGENTS → MEMORY → USER → Dynamic)

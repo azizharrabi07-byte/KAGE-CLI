@@ -39,3 +39,14 @@ jobs:
           python kage/tests/test_supervisor.py
           python kage/tests/test_tools.py
           python kage/tests/test_phases_3_8.py
+          python kage/tests/test_agents.py
+          python kage/tests/test_integrations.py
+          python kage/tests/test_security_hardened.py
+          python kage/tests/test_workflows_e2e.py
+          python kage/tests/test_core_modules.py
+          python kage/tests/test_ipc_tools.py
+          python kage/tests/test_coverage_boost.py
+      - name: Coverage
+        run: |
+          pip install pytest-cov
+          python -m pytest kage/tests/ --cov=kage --cov-report=term -q

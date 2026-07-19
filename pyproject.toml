@@ -1,0 +1,32 @@
+# KAGE OS — optional PyPI packaging metadata (PEP 621).
+# Install editable:  pip install -e ./kage  (uses this metadata).
+
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kage-os"
+version = "2.0.0"
+description = "KAGE OS — a personal AI operating system for the terminal (Termux-first)."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+authors = [{ name = "KAGE OS" }]
+dependencies = [
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+discord = ["discord.py>=2.3.2"]
+telegram = ["python-telegram-bot>=20.6"]
+dev = ["pytest>=8.0", "pytest-cov>=4.0"]
+
+[project.scripts]
+kage = "kage.kage:main"
+
+[tool.setuptools.packages.find]
+include = ["kage*"]
+
+[tool.pytest.ini_options]
+testpaths = ["kage/tests"]

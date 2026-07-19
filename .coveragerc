@@ -1,0 +1,15 @@
+# Coverage configuration for KAGE OS unit tests.
+[run]
+source = kage
+omit =
+    kage/tests/*
+    kage/kage.py
+    kage/agents/discord/*
+    kage/agents/telegram/*
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+show_missing = True

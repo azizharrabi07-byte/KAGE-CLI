@@ -3,6 +3,40 @@
 All notable changes follow [Semantic Versioning](https://semver.org/).
 Canonical version: `kage/__init__.py` → `__version__`.
 
+## [2.0.0] — final production release
+
+### Agents (real implementations replace placeholders)
+- **WhatsApp** (`agents/whatsapp/`): Baileys REST bridge client — QR auth, session
+  restore, send/receive, reconnection, health checks. Degrades gracefully.
+- **Obsidian** (`agents/obsidian/`): Local REST API — list vaults, read/write/append
+  files, search. API-token auth.
+- **Meta** (`agents/meta/`): self-upgrade — `upgrade.check` (git fetch + rev
+  compare), `upgrade.apply` (pull + tests, requires `confirm=True`).
+- **System** (`agents/system/`): device health — battery (termux-api / sysfs),
+  storage (statvfs), CPU (/proc/loadavg), memory (/proc/meminfo). No psutil.
+
+### Unified integration architecture
+- `BaseIntegration` ABC: `connect/disconnect/health_check/send/receive`.
+- Shared retry/timeout/backoff + auto-reconnect via `core.health`.
+- Structured `ToolResult` envelope + observability on every call.
+
+### Comprehensive testing
+- 73 pytest test functions / 186 assertions across 10 files, all passing.
+- Coverage **82%** (`pytest --cov`), excluding entry-point/SDK-transport glue.
+
+### Documentation (production grade)
+- `docs/`: ARCHITECTURE, DEVELOPER, API, USER, TROUBLESHOOTING.
+- `examples/workflows/`: onboarding, retry_demo, research_pipeline.
+
+### Security hardening
+- `validate_shell` now blocks command substitution (`$()`, backticks, `${}`).
+- `sanitize_path`, `sanitize_text`, `escape_shell_arg`, `restrict_to_sandbox`.
+- Secrets env-only + masked in logs.
+
+### Packaging & DevOps
+- `pyproject.toml` (PEP 621) for optional PyPI packaging.
+- `.coveragerc`; CI runs all 10 test files.
+
 ## [1.0.0] — supervisor-discord (Phases 3-8)
 
 Additive delivery on top of the existing supervisor (Phases 1-2). No existing

@@ -1,0 +1,16 @@
+{
+  "name": "Research & Save Pipeline",
+  "description": "Search the web, summarize with LLM, save to Obsidian vault.",
+  "entry": "search",
+  "steps": [
+    { "id": "search", "name": "Web search", "agent": "browser", "action": "web.search",
+      "input": { "query": "latest AI news" }, "next": "summarize" },
+    { "id": "summarize", "name": "Summarize", "agent": "meta", "action": "llm.complete",
+      "input": { "text": "..." },
+      "retry": { "max_attempts": 3, "base_delay": 0.2, "backoff_factor": 2 },
+      "branch": { "field": "status", "equals": "ok", "then_step": "save", "else_step": "notify" } },
+    { "id": "save", "name": "Save to vault", "agent": "obsidian", "action": "vault.save",
+      "input": { "path": "ai-news.md", "content": "..." }, "next": null },
+    { "id": "notify", "name": "Notify on failure", "agent": "discord", "action": "msg.send", "next": null }
+  ]
+}

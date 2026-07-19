@@ -46,6 +46,7 @@ jobs:
           python kage/tests/test_core_modules.py
           python kage/tests/test_ipc_tools.py
           python kage/tests/test_coverage_boost.py
+          python kage/tests/test_actions.py
       - name: Coverage
         run: |
           pip install pytest-cov

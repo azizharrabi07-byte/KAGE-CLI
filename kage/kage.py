@@ -87,7 +87,12 @@ def build_supervisor(cfg: Config) -> Supervisor:
     return Supervisor(
         registry=registry, memory_store=memory, session_store=sessions,
         tools=tools, security=security,
-        config=Config().__dict__ | {"default_user": cfg.default_user},
+        config=Config().__dict__ | {
+            "default_user": cfg.default_user,
+            "root": os.environ.get("KAGE_ROOT", ""),
+            "allow_destructive": os.environ.get(
+                "KAGE_ALLOW_DESTRUCTIVE", "").lower() in ("1", "true", "yes"),
+        },
         llm=llm,
     )
 

@@ -18,10 +18,13 @@ is fully usable *without* an LLM provider. When an LLM API key is configured,
 from __future__ import annotations
 
 import logging
+import os
 import re
+import shlex
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from .actions import ACTION_SCHEMA, Action, ActionExecutor, format_results, parse_actions
 from .registry import AgentRegistry
 
 log = logging.getLogger("kage.supervisor")
@@ -180,6 +183,11 @@ class Supervisor:
         # The "user" is identified by transport user id (Discord snowflake,
         # telegram id, "cli" for local). Memory/sessions are keyed on it.
         self.default_user = self.config.get("default_user", "cli")
+        # Action executor: lets Kage ACT (shell / file_edit / create_agent).
+        self.executor = ActionExecutor(
+            root=self.config.get("root", "") or os.environ.get("KAGE_ROOT", ""),
+            allow_all=bool(self.config.get("allow_destructive", False)),
+        )
 
     # -- context -------------------------------------------------------------
     def context_for(self, user_id: str) -> Dict[str, Any]:
@@ -289,16 +297,82 @@ class Supervisor:
 
         # default: chat — use the LLM brain if one is wired (e.g. core.brain.Brain)
         thinking.append("synthesizing supervisor reply")
+        reply = None
         if self.llm is not None:
             try:
-                context = self._llm_context(ctx)
-                text = self.llm(message, context)
-                if text:
-                    return Response(text, intent="chat", agent="Kage", thinking=thinking)
+                context = self._llm_context(ctx) + "\n\n" + ACTION_SCHEMA
+                reply = self.llm(message, context)
             except Exception as exc:  # noqa: BLE001 — fall back to rule-based reply
                 thinking.append(f"llm failed ({exc}); using fallback")
+                reply = None
+
+        # Kage is proactive: parse + execute any action in the reply (LLM JSON),
+        # or fall back to lightweight rule-based actions when no LLM is wired.
+        text, effects = self._run_actions(reply or "", message, uid, thinking)
+        if effects:
+            self._register_new_agents(effects)
+            base = (reply and parse_actions(reply)[1]) or ""
+            body = (base + "\n\n" + format_results(effects)).strip()
+            return Response(body or "Done.", intent="chat", agent="Kage",
+                            thinking=thinking, side_effects=effects)
+        if reply:
+            return Response(reply, intent="chat", agent="Kage", thinking=thinking)
         return Response(self._chat_text(message, user_name), intent="chat",
                         agent="Kage", thinking=thinking)
+
+    # -- action execution ----------------------------------------------------
+    def _run_actions(self, reply: str, message: str, uid: str,
+                     thinking: List[str]) -> tuple:
+        """Execute actions parsed from an LLM reply, or rule-based fallback.
+
+        Returns (display_text_unused, side_effects). Only acts when an action is
+        actually present, so normal chat is unaffected.
+        """
+        actions = parse_actions(reply)[0]
+        if not actions and self.llm is None:
+            actions = self._rule_actions(message)
+        if not actions:
+            return reply, []
+        thinking.append(f"executing {len(actions)} action(s)")
+        effects: List[Dict[str, Any]] = []
+        for act in actions:
+            try:
+                res = self.executor.execute(act)
+            except Exception as exc:  # noqa: BLE001 — never crash a turn
+                res = {"ok": False, "kind": act.kind, "error": str(exc)}
+            effects.append(res)
+        return reply, effects
+
+    def _rule_actions(self, message: str) -> List[Action]:
+        """No-LLM fallback intents so Kage can still ACT without a provider."""
+        low = message.lower()
+        actions: List[Action] = []
+        if (re.search(r"\b(list|show|ls|dir)\b", low)
+                and re.search(r"\b(files?|folders?|dir|directory|contents?)\b", low)
+                and "agent" not in low):
+            path = self._extract_path(message)
+            actions.append(Action("shell", {"command": f"ls -la {shlex.quote(path)}"}))
+        m = re.search(r"\bcreate\b.*?\bagent\b.*?\b(?:called|named)\s+([A-Za-z0-9_]+)", low)
+        if m:
+            actions.append(Action("create_agent", {"name": m.group(1)}))
+        return actions
+
+    @staticmethod
+    def _extract_path(message: str) -> str:
+        """Best-effort path token from a 'list files' request."""
+        m = re.search(r"(~[A-Za-z0-9_./-]+|[A-Za-z0-9_./-]+/[A-Za-z0-9_./-]+)", message)
+        if m:
+            return m.group(1)
+        return "~" if "home" in message.lower() else "."
+
+    def _register_new_agents(self, effects: List[Dict[str, Any]]) -> None:
+        """Best-effort discovery+register of agents just scaffolded."""
+        for fx in effects:
+            if fx.get("kind") == "create_agent" and fx.get("ok") and fx.get("register"):
+                try:
+                    self.registry.discover([fx["register"]])
+                except Exception:  # noqa: BLE001
+                    pass
 
     # -- delegation to agents/tools -----------------------------------------
     def _delegate(self, agent_name: Optional[str], task: Optional[Dict[str, Any]]) -> Dict[str, Any]:

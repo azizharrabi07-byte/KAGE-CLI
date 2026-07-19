@@ -1,7 +1,36 @@
-# Changelog
+## [2.1.0] — supervisor now ACTS (shell, file edit, create_agent)
 
-All notable changes follow [Semantic Versioning](https://semver.org/).
-Canonical version: `kage/__init__.py` → `__version__`.
+Kage is no longer reply-only. The supervisor parses action blocks from the LLM
+(or rule-based fallback) and executes them, folding results back into the
+response that Discord/CLI render.
+
+### core/actions.py (new)
+- `parse_actions(text)` — extracts JSON action blocks (fenced or bare), returns
+  the cleaned display text.
+- `ActionExecutor` — executes `shell`, `file_write` (create/overwrite/append),
+  `create_agent` (scaffolds `agents/<name>/` + auto-registers).
+- Tiered safety: FORBIDDEN (fork bombs, dd/mkfs to devices) never run; DANGEROUS
+  (`rm -rf /`, force push, sudo, shutdown) require `allow_destructive`; normal
+  commands (`ls`, `git add/commit/push`, file edits) run immediately.
+- `ACTION_SCHEMA` injected into LLM context so the model knows the action format.
+
+### supervisor.py
+- `think()` now runs actions from the LLM reply and returns results in
+  `Response.side_effects` + the rendered text.
+- No-LLM rule-based fallback: "list files" → `ls`, "create agent X" → scaffold.
+- Normal chat is unaffected (no action block ⇒ plain reply).
+
+### Transports
+- Discord (`/kage chat …`) and CLI (`kage chat …`) need **no changes** — they
+  already render `Response.text`, which now includes action results.
+
+### Config
+- `KAGE_ROOT` (project root for actions), `KAGE_ALLOW_DESTRUCTIVE=1`
+  (run destructive commands without confirmation).
+
+### Tests
+- `kage/tests/test_actions.py`: 46 tests (parse, executor, safety tiers,
+  supervisor integration with a mock LLM). Full suite: 232 assertions, all green.
 
 ## [2.0.0] — final production release
 

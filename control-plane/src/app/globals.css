@@ -1,0 +1,149 @@
+@import "tailwindcss";
+
+:root {
+  --kage-bg: #07070b;
+  --kage-bg-2: #0c0c14;
+  --kage-panel: rgba(255, 255, 255, 0.035);
+  --kage-border: rgba(255, 255, 255, 0.09);
+  --kage-border-strong: rgba(255, 255, 255, 0.16);
+  --kage-text: #e7e7ef;
+  --kage-muted: #9a9ab0;
+  --kage-violet: #8b5cf6;
+  --kage-violet-soft: #a78bfa;
+  --kage-emerald: #34d399;
+  --kage-amber: #fbbf24;
+  --kage-rose: #fb7185;
+  --kage-blue: #60a5fa;
+}
+
+html,
+body {
+  background: var(--kage-bg);
+  color: var(--kage-text);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(900px 500px at 78% -8%, rgba(139, 92, 246, 0.16), transparent 60%),
+    radial-gradient(700px 420px at 4% 8%, rgba(52, 211, 153, 0.08), transparent 55%);
+  background-attachment: fixed;
+}
+
+.mono {
+  font-family: ui-monospace, "SF Mono", "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+}
+
+/* Subtle engineering grid behind panels */
+.k-grid {
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+.k-card {
+  background: var(--kage-panel);
+  border: 1px solid var(--kage-border);
+  border-radius: 16px;
+  backdrop-filter: blur(10px);
+}
+
+.k-card-hover {
+  transition: border-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.k-card-hover:hover {
+  border-color: var(--kage-border-strong);
+  transform: translateY(-1px);
+}
+
+.k-inset {
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid var(--kage-border);
+  border-radius: 12px;
+}
+
+.k-chip {
+  border: 1px solid var(--kage-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.k-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  border: 1px solid var(--kage-border);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.4rem 0.7rem;
+  font-size: 0.8rem;
+  transition: all 0.13s ease;
+  cursor: pointer;
+}
+.k-btn:hover {
+  border-color: var(--kage-border-strong);
+  background: rgba(255, 255, 255, 0.09);
+}
+.k-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.k-btn-primary {
+  background: linear-gradient(180deg, rgba(139, 92, 246, 0.9), rgba(124, 58, 237, 0.9));
+  border-color: rgba(167, 139, 250, 0.6);
+  color: white;
+}
+.k-btn-primary:hover {
+  background: linear-gradient(180deg, rgba(151, 102, 255, 1), rgba(139, 92, 246, 1));
+}
+
+.k-input {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--kage-border);
+  border-radius: 10px;
+  padding: 0.5rem 0.7rem;
+  color: var(--kage-text);
+  font-size: 0.85rem;
+  outline: none;
+}
+.k-input:focus {
+  border-color: var(--kage-violet-soft);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.16);
+}
+
+::selection {
+  background: rgba(139, 92, 246, 0.35);
+}
+
+/* Scrollbars */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+}
+
+@keyframes kage-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.k-live {
+  animation: kage-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes kage-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.k-fade {
+  animation: kage-fade 0.25s ease both;
+}

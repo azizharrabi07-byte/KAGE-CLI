@@ -1,0 +1,28 @@
+name: CI
+
+# Phase 8 — continuous integration for the KAGE OS control plane.
+# Mirrors the KAGE-CLI spec's intent (lint / type-check / build) on the real
+# Next.js + TypeScript stack.
+on:
+  push:
+    branches: [main, supervisor-discord]
+  pull_request:
+    branches: [main, supervisor-discord]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: Type-check
+        run: npm run typecheck
+      - name: Build
+        run: npm run build

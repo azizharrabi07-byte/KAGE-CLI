@@ -1,0 +1,31 @@
+name: Release
+
+# Phase 8 — create a GitHub release when a semantic-version tag is pushed.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Read version
+        id: ver
+        run: echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: KAGE OS ${{ steps.ver.outputs.tag }}
+          generate_release_notes: true
+          body: |
+            KAGE OS — supervisor control plane.
+
+            See CHANGELOG.md for the full release notes.

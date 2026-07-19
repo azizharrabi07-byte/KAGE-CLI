@@ -1,0 +1,11 @@
+{
+  "name": "Retry & Backoff Demo",
+  "description": "A flaky step that fails twice then succeeds, exercising per-step retry.",
+  "entry": "flaky",
+  "steps": [
+    { "id": "flaky", "name": "Flaky external call", "agent": "browser", "action": "browser.navigate",
+      "input": { "fail_times": 2 },
+      "retry": { "max_attempts": 4, "base_delay": 0.08, "backoff_factor": 2 } },
+    { "id": "persist", "name": "Persist result", "agent": "obsidian", "action": "obsidian.write" }
+  ]
+}

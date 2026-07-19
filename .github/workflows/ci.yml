@@ -38,3 +38,4 @@ jobs:
         run: |
           python kage/tests/test_supervisor.py
           python kage/tests/test_tools.py
+          python kage/tests/test_phases_3_8.py

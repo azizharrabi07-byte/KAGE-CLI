@@ -45,3 +45,25 @@ A decisive, intelligent AI OS inspired by Hermes, OpenCode, OpenClaw, and OpenCl
 ## License
 
 MIT
+
+---
+
+## 🆕 Phases 3-8 (`supervisor-discord`)
+
+Additive, opt-in refinements — **your existing Python (Phases 1-2) is untouched.**
+
+- **Phase 3** — production CLI REPL + config wizard + `--json/--yaml/--dry-run`.
+- **Phase 4** — `ToolResult` envelope + retry/timeout/backoff + health probes.
+- **Phase 5** — workflow conditional branching + per-step retry (resumable).
+- **Phase 6** — secrets (env-only), sandboxed shell, structured logs/metrics/traces.
+- **Phase 7** — `kage/tests/test_phases_3_8.py` + `docs/` + `examples/`.
+- **Phase 8** — semver `1.0.0`, `release.yml` + `control-plane-ci.yml`.
+
+Quick check:
+```bash
+python kage/tests/test_phases_3_8.py        # 38 tests
+python -m kage.cli                          # interactive REPL (--json/--yaml/--dry-run)
+```
+
+An optional **web control plane** lives in [`control-plane/`](control-plane/README.md)
+(Next.js + PostgreSQL) — same contracts, with a dashboard UI.

@@ -1,0 +1,25 @@
+name: Release
+
+# Phase 8 — create a GitHub release on a semantic-version tag.
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: KAGE OS ${{ github.ref_name }}
+          generate_release_notes: true
+          body: |
+            KAGE OS release. See CHANGELOG.md and docs/ for details.

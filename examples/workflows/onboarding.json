@@ -1,0 +1,13 @@
+{
+  "name": "Discord Onboarding",
+  "description": "Recall context, compose a greeting (branching) and post to Discord.",
+  "entry": "recall",
+  "steps": [
+    { "id": "recall", "name": "Recall context", "agent": "memory", "action": "memory.recall" },
+    { "id": "decide", "name": "Compose greeting", "agent": "discord", "action": "llm.complete",
+      "retry": { "max_attempts": 3, "base_delay": 0.1, "backoff_factor": 2 },
+      "branch": { "field": "status", "equals": "ok", "then_step": "send", "else_step": "fallback" } },
+    { "id": "send", "name": "Post to Discord", "agent": "discord", "action": "discord.send", "next": null },
+    { "id": "fallback", "name": "Fallback note", "agent": "obsidian", "action": "obsidian.write", "next": null }
+  ]
+}

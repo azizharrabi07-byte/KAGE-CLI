@@ -257,17 +257,21 @@ class Supervisor:
         if intent == "memory_recall":
             value = recall_memory(ctx["memory"], message)
             thinking.append("found memory" if value else "no matching memory")
-            if value and re.search(r"\b(my name|who am i)\b", message.lower()):
-                text = f"Your name is **{value}**. 🧠"
-            elif value:
+            if value:
+                # Build attribution tag for ANY recall path.
                 agent_src = ""
                 if hasattr(self.memory, "get_attribution"):
                     for k, v in ctx["memory"].items():
-                        if v == value:
-                            agent_src = self.memory.get_attribution(uid, k)
-                            break
+                        if v == value or k in str(value) or v in str(value):
+                            a = self.memory.get_attribution(uid, k)
+                            if a:
+                                agent_src = a
+                                break
                 src_tag = f" (via {agent_src})" if agent_src else ""
-                text = f"From memory: **{value}**. 🧠{src_tag}"
+                if re.search(r"\b(my name|who am i)\b", message.lower()):
+                    text = f"Your name is **{value}**. 🧠{src_tag}"
+                else:
+                    text = f"From memory: **{value}**. 🧠{src_tag}"
             else:
                 text = ("I don't have that in memory yet. Tell me with "
                         '"remember …" or "memory add <key> <value>".')

@@ -168,6 +168,51 @@ def test_supervisor_backward_compat():
     check("memory_add still works", sup.think("remember my name is Daddy", user_id="u").intent == "memory_add")
     check("search still routes", sup.think("search AI news", user_id="u").agent == "Whiz")
 
+def test_name_recall_shows_attribution():
+    """The attribution (via Mira) should appear even in name-specific recall."""
+    reg = AgentRegistry()
+    sup = Supervisor(registry=reg, memory_store=MemoryStore(root=str(Path(tempfile.mkdtemp())/"m")))
+    sup.think("remember my name is Daddy", user_id="u")
+    r = sup.think("what is my name?", user_id="u")
+    check("name recall has attribution", "via Mira" in r.text)
+    check("name recall has value", "Daddy" in r.text)
+
+def test_general_recall_shows_attribution():
+    reg = AgentRegistry()
+    sup = Supervisor(registry=reg, memory_store=MemoryStore(root=str(Path(tempfile.mkdtemp())/"m")))
+    sup.think("remember my name is Daddy", user_id="u")
+    r = sup.think("what do you remember about me?", user_id="u")
+    check("general recall has attribution", "via Mira" in r.text)
+
+def test_messages_table_has_agent_column():
+    s = SessionStore(db_path=str(Path(tempfile.mkdtemp()) / "s.db"))
+    cols = [r[1] for r in s.conn.execute("PRAGMA table_info(messages)")]
+    check("messages has agent column", "agent" in cols)
+
+def test_messages_table_has_title_and_summary():
+    s = SessionStore(db_path=str(Path(tempfile.mkdtemp()) / "s.db"))
+    sid = s.create("u1", title="My Chat")
+    cols = [r[1] for r in s.conn.execute("PRAGMA table_info(sessions)")]
+    check("sessions has title", "title" in cols)
+    check("sessions has summary", "summary" in cols)
+    check("title stored", s.get(sid)["title"] == "My Chat")
+
+def test_session_migration_adds_agent_column():
+    """Old DB without agent column should auto-migrate."""
+    d = Path(tempfile.mkdtemp()); db = str(d / "old2.db")
+    import sqlite3
+    conn = sqlite3.connect(db)
+    conn.executescript("""CREATE TABLE sessions (id INTEGER PRIMARY KEY, user_id TEXT,
+        platform TEXT, title TEXT, status TEXT, created_at REAL, updated_at REAL);
+        CREATE TABLE messages (id INTEGER PRIMARY KEY, session_id INTEGER,
+        role TEXT, author TEXT, content TEXT, created_at REAL);""")
+    conn.execute("INSERT INTO sessions VALUES(1,'u','cli','t','active',1,1)")
+    conn.commit(); conn.close()
+    s = SessionStore(db_path=db)
+    cols = [r[1] for r in s.conn.execute("PRAGMA table_info(messages)")]
+    check("migration adds agent col to messages", "agent" in cols)
+    s.close()
+
 def main() -> int:
     global _failed
     tests = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

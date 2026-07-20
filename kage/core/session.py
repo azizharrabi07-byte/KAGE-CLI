@@ -42,6 +42,7 @@ class SessionStore:
             """
         )
         self._ensure_column("sessions", "summary", "")
+        self._ensure_column("messages", "agent", "")
         self.conn.commit()
 
     def _ensure_column(self, table: str, column: str, default: str) -> None:

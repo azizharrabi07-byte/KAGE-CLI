@@ -235,7 +235,7 @@ def _help_text() -> str:
     by_cat: Dict[str, List[Command]] = {}
     for c in COMMANDS:
         by_cat.setdefault(c.category, []).append(c)
-    lines = [f"{__version__} — commands:"]
+    lines = [f"KAGE AI OS v{__version__} — commands:"]
     for cat in order:
         if cat not in by_cat:
             continue

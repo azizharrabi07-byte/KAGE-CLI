@@ -25,13 +25,37 @@ class AgentRegistry:
         self._instances: Dict[str, BaseAgent] = {}
 
     # -- registration --------------------------------------------------------
-    def register(self, agent_cls: type[BaseAgent], config: Optional[Dict[str, Any]] = None) -> None:
-        """Register an agent class (lazily instantiated on first use)."""
-        name = getattr(agent_cls, "name", None) or agent_cls.__name__
-        config = config or {}
+    def register(self, agent_or_name: Any = None, agent_cls: Any = None,
+                 config: Optional[Dict[str, Any]] = None) -> None:
+        """Register an agent class (lazily instantiated on first use).
+
+        Accepts BOTH common call styles so callers cannot hit a
+        ``missing positional argument`` failure:
+
+            register(cls)                   # register the class (name from cls.name)
+            register(cls, config={...})     # class + config
+            register("name", cls)           # explicit name + class
+            register("name", cls, config={...})
+        """
+        if agent_or_name is None and agent_cls is None:
+            raise TypeError("register() requires an agent class")
+        # Distinguish register(name, cls[, config]) from register(cls[, config]).
+        if isinstance(agent_or_name, str):
+            explicit_name: Optional[str] = agent_or_name
+            cls = agent_cls
+            if cls is None:
+                raise TypeError("register(name, cls) requires the agent class")
+        else:
+            explicit_name = None
+            cls = agent_or_name
+            # register(cls, {config_dict}) called positionally
+            if isinstance(agent_cls, dict) and config is None:
+                config = agent_cls
+        name = explicit_name or getattr(cls, "name", None) or cls.__name__
+        cfg = config or {}
 
         def _factory(supervisor: Any = None) -> BaseAgent:
-            return agent_cls(supervisor=supervisor, config=dict(config))
+            return cls(supervisor=supervisor, config=dict(cfg))
 
         self._factories[name] = _factory
         log.debug("registered agent %s", name)

@@ -175,6 +175,21 @@ def _secrets(args, ctx) -> str:
     return "usage: /secrets list | add <k> <v> | remove <k>"
 
 
+def _health(args, ctx) -> str:
+    """Exercise the retry/timeout backoff path and report a health check."""
+    attempts = {"n": 0}
+
+    def flaky(attempt: int) -> str:
+        attempts["n"] = attempt
+        if attempt < 2:
+            raise RuntimeError("simulated transient failure")
+        return "ok"
+
+    res = run_with_retry(flaky, max_attempts=3, base_delay=0.01)
+    return (f"💚 health: {res.status} (recovered after {attempts['n']} attempts, "
+            f"{res.durationMs:.1f}ms) — retry/backoff OK")
+
+
 def _tools(args, ctx) -> str:
     tools = ctx.get("tool_manager")
     if not tools:
@@ -199,6 +214,7 @@ COMMANDS: List[Command] = [
     Command("/memory", "remember a fact: /memory add <k> <v>", "agents"),
     Command("/workflow", "run a workflow file", "workflows"),
     Command("/shell", "run a sandboxed command", "tools"),
+    Command("/health", "retry/timeout backoff health check", "tools"),
     Command("/system", "device/system health report", "agents"),
     Command("/session", "session control: new|list|resume", "sessions"),
     Command("/version", "print KAGE version", "core"),
@@ -210,19 +226,23 @@ HANDLERS: Dict[str, Callable] = {
     "/plugins": _plugins, "/install": _install, "/remove": _remove,
     "/harness": _harness, "/tools": _tools, "/config": _config,
     "/secrets": _secrets, "/providers": _providers, "/models": _models,
+    "/health": _health,
 }
 
 
 def _help_text() -> str:
-    lines = [f"KAGE AI OS v{__version__} — commands", ""]
-    cat = ""
+    order = ["core", "agents", "tools", "workflows", "plugins", "harness", "config", "sessions"]
+    by_cat: Dict[str, List[Command]] = {}
     for c in COMMANDS:
-        if c.category != cat:
-            cat = c.category
-            lines.append(f"  [{cat}]")
-        lines.append(f"    {c.name:<14} {c.description}")
-    lines.append("")
-    lines.append("  Anything else is sent to the supervisor as a message.")
+        by_cat.setdefault(c.category, []).append(c)
+    lines = [f"{__version__} — commands:"]
+    for cat in order:
+        if cat not in by_cat:
+            continue
+        lines.append(f"  {cat}")
+        for c in by_cat[cat]:
+            lines.append(f"    {c.name:<13} {c.description}")
+    lines.append("  (plain text → sent to the supervisor)")
     return "\n".join(lines)
 
 

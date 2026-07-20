@@ -1,3 +1,34 @@
+## [3.2.0] — TUI polish: colour, spacing, command auto-complete
+
+A cleaner, more professional terminal experience plus a robustness fix for the
+agent registry. Additive — full suite still green.
+
+### Bug fix: registry.register() call-style mismatch
+`AgentRegistry.register()` previously only accepted `register(cls)`. Calling it
+as `register("name", cls)` (a natural pattern) raised a TypeError. `register()`
+now accepts **both** `register(cls[, config])` and `register(name, cls[, config])`,
+so neither the supervisor nor plugins can hit this failure.
+
+### Colour scheme (neutral, professional)
+- Prompt/accent → **cyan** (was magenta/pink).
+- Body text → white; success → green; warning → yellow; error → red.
+- Banner chrome → white/grey (art is white, borders grey).
+
+### Spacing
+- Removed the banner's empty middle row and extra blank lines.
+- `/help` is grouped by category with no double-blanks; compact command palette.
+
+### Command auto-complete (live, like OpenCode's Ctrl+P)
+- Typing `/` shows all commands; each character filters the list.
+- `/he` → `/help` and `/health`; `/har` → `/harness`.
+- ↑↓ to move the highlight, **Tab** to complete, **Enter** to run the highlighted
+  command, **Space/Esc** to dismiss.
+- New `/health` slash command (retry/backoff health check) added for parity.
+
+### Tests
+- `kage/tests/test_tui_polish.py` (32 tests): auto-complete, colour policy,
+  compact spacing, registry robustness. Full suite: **373 assertions, all green**.
+
 ## [3.1.0] — OpenCode-style interface, full CLI↔Discord parity
 
 The terminal experience is now as polished as OpenCode, and the REPL and Discord

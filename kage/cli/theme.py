@@ -2,19 +2,26 @@
 
 Pure rendering helpers (return strings) so they are fully unit-testable without
 a real terminal. The TUI (cli/tui.py) composes these for the OpenCode-style
-interface. Colors auto-disable when stdout is not a TTY or NO_COLOR is set.
+interface.
+
+Colour policy (clean, professional):
+  • prompt / accent → cyan        • text → white
+  • success → green               • warning → yellow
+  • error → red                   • banner / chrome → white / grey
+Colors auto-disable when stdout is not a TTY or NO_COLOR is set.
 """
 
 from __future__ import annotations
 
 import os
+import re
 import shutil
 from typing import Iterable
 
 # --- ANSI -------------------------------------------------------------------
 
 class C:
-    """ANSI escape sequences. All empty when color is disabled."""
+    """ANSI escape sequences."""
     RESET = "\033[0m"
     BOLD = "\033[1m"
     DIM = "\033[2m"
@@ -22,10 +29,13 @@ class C:
     GREEN = "\033[32m"
     YELLOW = "\033[33m"
     BLUE = "\033[34m"
-    MAGENTA = "\033[35m"
+    MAGENTA = "\033[35m"   # kept for compatibility; not used in the default theme
     CYAN = "\033[36m"
     GRAY = "\033[90m"
-    BG_VIOLET = "\033[48;5;54m"
+    WHITE = "\033[97m"     # bright white for body text
+
+
+_ANSI_RE = re.compile(r"\033\[[0-9;]*m")
 
 
 def color_enabled(stream=None) -> bool:
@@ -44,15 +54,22 @@ def paint(text: str, color: str, *, bold: bool = False, enabled: bool | None = N
     return f"{C.BOLD if bold else ''}{color}{text}{C.RESET}"
 
 
+def visible_len(text: str) -> int:
+    """Length of ``text`` ignoring ANSI escapes (public, used by the TUI)."""
+    return len(_ANSI_RE.sub("", text))
+
+
 def status_color(status: str) -> str:
-    """Map a status word to its color."""
+    """Map a status word to its colour: green/yellow/red/grey."""
     s = (status or "").lower()
     if s in ("ok", "healthy", "awake", "completed", "running", "success", "on"):
         return C.GREEN
     if s in ("executing", "degraded", "paused", "draft", "warn", "warning"):
         return C.YELLOW
-    if s in ("error", "down", "failed", "sleeping", "off", "needs_confirmation"):
-        return C.RED if s in ("error", "down", "failed") else C.GRAY
+    if s in ("error", "down", "failed"):
+        return C.RED
+    if s in ("sleeping", "off", "needs_confirmation"):
+        return C.GRAY
     return C.CYAN
 
 
@@ -70,47 +87,37 @@ BANNER_ART = r"""
 
 def banner(version: str = "", subtitle: str = "Terminal AI Operating System",
            *, enabled: bool | None = None) -> str:
-    """Render the welcome banner as a string."""
+    """Render the welcome banner (white/grey chrome) as a compact string."""
     on = color_enabled() if enabled is None else enabled
-    art = "\n".join(paint(line, C.MAGENTA, bold=True, enabled=on) for line in BANNER_ART.splitlines())
-    title = paint("KAGE AI OS", C.BOLD, bold=True, enabled=on)
-    ver = paint(f"v{version}", C.CYAN, enabled=on) if version else ""
-    sub = paint(subtitle, C.DIM, enabled=on)
-    hint = paint('Ask anything... "What can you do?"', C.GRAY, enabled=on)
-    keys = (f"  {paint('⌘ Tab', C.YELLOW, enabled=on)} agents   "
-            f"{paint('⌘ Ctrl+P', C.YELLOW, enabled=on)} commands   "
-            f"{paint('⌘ Ctrl+F', C.YELLOW, enabled=on)} sessions")
     width = 61
     top = paint("┌" + "─" * width + "┐", C.GRAY, enabled=on)
     bot = paint("└" + "─" * width + "┘", C.GRAY, enabled=on)
+    border = paint("│", C.GRAY, enabled=on)
     lines = [top]
     for art_line in BANNER_ART.splitlines():
-        pad = (61 - len(art_line)) // 2
-        line = paint(art_line, C.MAGENTA, bold=True, enabled=on)
-        lines.append(paint("│", C.GRAY, enabled=on) + " " * pad + line + " " * (61 - pad - len(art_line)) + paint("│", C.GRAY, enabled=on))
-    lines.append(_row(f"{title} {ver}", width, on))
-    lines.append(_row(sub, width, on))
-    lines.append(_row(hint, width, on))
-    lines.append(_row("", width, on))
-    lines.append(_row(keys.strip(), width, on))
+        art = paint(art_line, C.WHITE, bold=True, enabled=on)
+        pad = (width - len(art_line)) // 2
+        lines.append(border + " " * pad + art + " " * (width - pad - len(art_line)) + border)
+    title = paint("KAGE AI OS", C.WHITE, bold=True, enabled=on)
+    ver = paint(f"v{version}", C.CYAN, enabled=on) if version else ""
+    lines.append(_row(f"{title} {ver}".strip(), width, on))
+    lines.append(_row(paint(subtitle, C.DIM, enabled=on), width, on))
+    lines.append(_row(paint('Ask anything... "What can you do?"', C.GRAY, enabled=on), width, on))
+    keys = (f"{paint('Tab', C.CYAN, enabled=on)} agents   "
+            f"{paint('Ctrl+P', C.CYAN, enabled=on)} commands   "
+            f"{paint('Ctrl+F', C.CYAN, enabled=on)} sessions")
+    lines.append(_row(keys, width, on))
     lines.append(bot)
     return "\n".join(lines)
 
 
-def _row(text: str, width: int, on: bool, *, color: str = "") -> str:
-    """A banner row padded inside │ borders."""
-    visible = _visible_len(text)
+def _row(text: str, width: int, on: bool) -> str:
+    """A centered banner row inside │ borders."""
+    visible = visible_len(text)
     pad = max(2, (width - visible) // 2)
     right = width - visible - pad
-    body = paint(color, "", enabled=on)
-    return (paint("│", C.GRAY, enabled=on) + " " * pad + text + " " * right
-            + paint("│", C.GRAY, enabled=on))
-
-
-def _visible_len(text: str) -> int:
-    """Length of ``text`` ignoring ANSI escapes (rough)."""
-    import re
-    return len(re.sub(r"\033\[[0-9;]*m", "", text))
+    border = paint("│", C.GRAY, enabled=on)
+    return border + " " * pad + text + " " * right + border
 
 
 # --- status line -----------------------------------------------------------
@@ -118,66 +125,67 @@ def _visible_len(text: str) -> int:
 def status_line(*, version: str = "", provider: str = "", model: str = "",
                 agents: int = 0, session: str = "", memory_mb: float = 0.0,
                 enabled: bool | None = None) -> str:
-    """Render the persistent bottom status line."""
+    """Render the compact persistent status line."""
     on = color_enabled() if enabled is None else enabled
-    left = " · ".join(p for p in [paint("KAGE", C.BOLD, bold=True, enabled=on) + paint(f" v{version}", C.DIM, enabled=on),
-                                  _pm(provider, model, on)] if p)
-    right = "  ".join(p for p in [f"{paint('Agents:', C.GRAY, enabled=on)} {agents}",
-                                  f"{paint('Mem:', C.GRAY, enabled=on)} {memory_mb:.0f}MB",
-                                  f"{paint('Session:', C.GRAY, enabled=on)} {session}"] if p)
+    left_bits = [paint("KAGE", C.WHITE, bold=True, enabled=on) + paint(f" v{version}", C.DIM, enabled=on)]
+    pm = _pm(provider, model, on)
+    if pm:
+        left_bits.append(pm)
+    left = " · ".join(left_bits)
+    right = "  ".join([f"{paint('Agents:', C.GRAY, enabled=on)} {agents}",
+                       f"{paint('Mem:', C.GRAY, enabled=on)} {memory_mb:.0f}MB",
+                       f"{paint('Session:', C.GRAY, enabled=on)} {session}"])
     bar = paint("─" * 64, C.GRAY, enabled=on)
-    return f"{bar}\n{left}\n{right}"
+    return f"{bar}\n{left}   {right}"
 
 
 def _pm(provider: str, model: str, on: bool) -> str:
     bits = [b for b in [provider, model] if b]
-    if not bits:
-        return ""
-    return paint(" · ".join(bits), C.CYAN, enabled=on)
+    return paint(" · ".join(bits), C.CYAN, enabled=on) if bits else ""
 
 
 # --- panels -----------------------------------------------------------------
 
 def agent_panel(agents: Iterable[dict], *, enabled: bool | None = None) -> str:
-    """Render the Tab agent list panel."""
+    """Render the Tab agent list panel (compact)."""
     on = color_enabled() if enabled is None else enabled
-    header = paint("  AGENTS", C.BOLD, bold=True, enabled=on)
+    header = paint("AGENTS", C.WHITE, bold=True, enabled=on)
     rows = []
     for a in agents:
         dot = paint("●", C.GREEN if a.get("awake") else C.GRAY, enabled=on)
-        name = paint(f"{a.get('emoji','🤖')} {a.get('name','?'):<12}", C.BOLD, enabled=on)
+        name = paint(f"{a.get('emoji','🤖')} {a.get('name','?'):<12}", C.WHITE, bold=True, enabled=on)
         kind = paint(str(a.get("kind", "")), C.DIM, enabled=on)
-        state = paint("running" if a.get("awake") else "idle", status_color("awake" if a.get("awake") else "idle"), enabled=on)
-        rows.append(f"  {dot} {name} {kind:<12} {state}")
-    body = "\n".join(rows) if rows else paint("  (no agents registered)", C.GRAY, enabled=on)
+        state = paint("running" if a.get("awake") else "idle",
+                      status_color("awake" if a.get("awake") else "idle"), enabled=on)
+        rows.append(f" {dot} {name} {kind:<12} {state}")
+    body = "\n".join(rows) if rows else paint(" (no agents registered)", C.GRAY, enabled=on)
     return f"{header}\n{body}"
 
 
 def command_palette(commands: Iterable[tuple], *, enabled: bool | None = None) -> str:
-    """Render the Ctrl+P command palette. ``commands`` = list of (cmd, desc)."""
+    """Render the Ctrl+P command palette (compact). ``commands`` = list of (cmd, desc)."""
     on = color_enabled() if enabled is None else enabled
-    header = paint("  COMMAND PALETTE", C.BOLD, bold=True, enabled=on)
+    header = paint("COMMAND PALETTE", C.WHITE, bold=True, enabled=on)
     rows = []
     for cmd, desc in commands:
-        rows.append(f"  {paint(cmd, C.CYAN, enabled=on):<22} {paint(desc, C.DIM, enabled=on)}")
-    body = "\n".join(rows) if rows else paint("  (no commands)", C.GRAY, enabled=on)
-    foot = paint("  ↑↓ select · Enter run · Esc close", C.GRAY, enabled=on)
-    return f"{header}\n{body}\n{foot}"
+        rows.append(f" {paint(cmd, C.CYAN, enabled=on):<22} {paint(desc, C.DIM, enabled=on)}")
+    body = "\n".join(rows) if rows else paint(" (no commands)", C.GRAY, enabled=on)
+    return f"{header}\n{body}\n {paint('↑↓ select · Enter run · Esc close', C.GRAY, enabled=on)}"
 
 
 def session_panel(sessions: Iterable[dict], active_id: str | None = None,
                   *, enabled: bool | None = None) -> str:
-    """Render the Ctrl+F session list (active one marked/pinned)."""
+    """Render the Ctrl+F session list (active one pinned)."""
     on = color_enabled() if enabled is None else enabled
-    header = paint("  SESSIONS", C.BOLD, bold=True, enabled=on)
+    header = paint("SESSIONS", C.WHITE, bold=True, enabled=on)
     rows = []
     for s in sessions:
         sid = str(s.get("id", "?"))
         marker = paint("📌", C.YELLOW, enabled=on) if sid == str(active_id) else "  "
         title = str(s.get("title", "session"))
         state = paint(str(s.get("status", "")), status_color(s.get("status", "")), enabled=on)
-        rows.append(f"  {marker} {sid:<10} {title:<24} {state}")
-    body = "\n".join(rows) if rows else paint("  (no sessions)", C.GRAY, enabled=on)
+        rows.append(f" {marker} {sid:<10} {title:<24} {state}")
+    body = "\n".join(rows) if rows else paint(" (no sessions)", C.GRAY, enabled=on)
     return f"{header}\n{body}"
 
 

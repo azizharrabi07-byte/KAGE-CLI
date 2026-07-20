@@ -7,5 +7,5 @@ commands) and, optionally, the Discord/Telegram transport agents.
 Public entry point: ``kage.kage:main`` (registered as the ``kage`` script).
 """
 
-__version__ = "3.1.0"
+__version__ = "3.2.0"
 __all__ = ["__version__"]

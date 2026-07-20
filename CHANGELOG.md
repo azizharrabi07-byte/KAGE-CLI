@@ -1,3 +1,28 @@
+## [3.1.0] — OpenCode-style interface, full CLI↔Discord parity
+
+The terminal experience is now as polished as OpenCode, and the REPL and Discord
+bot expose identical capabilities through a unified command registry. Additive —
+341 assertions still green.
+
+### OpenCode-style TUI (`cli/tui.py`, `cli/theme.py`)
+- ASCII welcome banner with version + key hints.
+- Persistent status line: `KAGE v3.1.0 · Groq (llama-3.3-70b) · Agents · Mem · Session`.
+- **Tab** agent panel (running/idle), **Ctrl+P** command palette, **Ctrl+F** sessions.
+- Colour-coded output (green/yellow/red); auto-disables when piped (NO_COLOR-safe).
+- Raw-key input via termios on Termux; graceful line-mode fallback (CI/pipe/test).
+
+### Unified command registry (`cli/commands.py`) — CLI ↔ Discord parity
+- Single source of truth: 20 slash commands; new ones appear in BOTH interfaces.
+- `/harness start|stop|run|status` continuous-improvement controls.
+- `/plugins /install /remove` plugin management in the REPL.
+
+### New CLI subcommands
+- `kage install <name>`, `kage remove <name>`, `kage plugins`, `kage harness <action>`.
+- `kage repl` now launches the TUI (auto-discovers plugins).
+
+### Tests
+- `kage/tests/test_tui.py` (57 tests). Full suite: **341 assertions, all green**.
+
 ## [3.0.0] — master architecture (modular, plugin-based, event-driven OS)
 
 KAGE is redesigned as an AI Operating System where intelligence emerges from

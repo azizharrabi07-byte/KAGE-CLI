@@ -86,3 +86,52 @@ and dependencies (`depends_on`). State persists to SQLite so runs resume.
 ## 8. Troubleshooting
 
 See [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+## 9. The OpenCode-style Terminal Interface (v3.1)
+
+`kage repl` launches a polished terminal UI:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│   ██╗  ██╗ █████╗ ...   (KAGE ASCII banner)                 │
+│   KAGE AI OS v3.1.0 · Terminal AI Operating System          │
+│   ⌘ Tab agents  ⌘ Ctrl+P commands  ⌘ Ctrl+F sessions       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+| Key | Action |
+|---|---|
+| **Tab** | Agent list panel (running/idle status) |
+| **Ctrl+P** | Command palette (all slash commands) |
+| **Ctrl+F** | Session list (pins the active session) |
+| **Ctrl+L** | Clear screen |
+| **Ctrl+C/D** | Quit |
+
+The persistent status line shows `KAGE v3.1.0 · Groq (llama-3.3-70b)` and
+`Agents: N · Mem: XXmb · Session: kage-xxx`. Output is colour-coded
+(green = success, yellow = warning, red = error); colors auto-disable when piped.
+
+### CLI ↔ Discord parity
+Every command lives in the **unified registry** (`kage/cli/commands.py`), so the
+Termux REPL and the Discord bot expose identical capabilities:
+
+`/help /agents /plugins /install /remove /harness /tools /config /secrets
+/providers /models /search /research /memory /workflow /shell /system /session
+/version /exit`
+
+### Plugin management
+```bash
+kage plugins               # list installed plugins
+kage install summarizer    # install a plugin (manifest.yaml)
+kage remove summarizer     # remove it
+```
+
+### The Harness (continuous improvement)
+```bash
+kage harness start         # begin monitoring
+kage harness run           # run one analyze→propose→report cycle
+kage harness status
+kage harness stop
+```
+The Harness benchmarks latency/tokens/success, computes a health score, and
+proposes upgrades **for your approval** — never auto-applies them.

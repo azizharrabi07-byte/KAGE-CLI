@@ -271,41 +271,39 @@ SLASH_HELP = {
 
 
 def repl(supervisor: Supervisor) -> int:
-    print(f"KAGE OS v{__version__} — type /help for commands, /quit to exit.")
+    """Launch the OpenCode-style TUI (banner, status line, Tab/Ctrl+P/Ctrl+F)."""
+    from .core.plugins import PluginManager
+    try:
+        from .cli.tui import KageTUI
+    except Exception:  # noqa: BLE001 — fall back to plain loop if TUI unavailable
+        return _repl_plain(supervisor)
+    pm = PluginManager(registry=supervisor.registry, plugin_root="kage/plugins")
+    try:
+        pm.install_all()
+    except Exception:  # noqa: BLE001
+        pass
+    tui = KageTUI(supervisor=supervisor, registry=supervisor.registry,
+                  tool_manager=supervisor.tools, plugin_manager=pm,
+                  sessions=getattr(supervisor, "sessions", None))
+    return tui.run()
+
+
+def _repl_plain(supervisor: Supervisor) -> int:
+    """Minimal line-based fallback REPL (kept for environments without the TUI)."""
     uid = supervisor.default_user
+    print(f"KAGE OS v{__version__} — /help, /quit")
     while True:
         try:
             line = input("kage> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print()
-            return 0
+            print(); return 0
         if not line:
             continue
         if line in ("/quit", "/exit"):
             return 0
-        if line == "/help":
-            for k, v in SLASH_HELP.items():
-                print(f"  {k:<10} {v}")
-            continue
-        if line == "/agents":
-            for a in supervisor.registry.all_info():
-                print(f'  {a["emoji"]} {a["name"]:<10} {a["kind"]:<10} '
-                      f'{"awake" if a["awake"] else "asleep"}')
-            continue
-        if line == "/tools":
-            for t in supervisor.tools.describe_all():
-                flag = "⚠️" if t["destructive"] else "✅"
-                print(f'  {flag} {t["name"]:<14} {t["description"]}')
-            continue
-        if line == "/system":
-            line = "system status"
-        # strip a leading slash and treat as a message
         msg = line[1:] if line.startswith("/") else line
         resp = supervisor.think(msg, user_id=uid)
-        print(f"{resp.emoji if hasattr(resp,'emoji') else '🥷'} {resp.agent} · {resp.intent}")
-        print(resp.text)
-        print()
-    return 0
+        print(f"{getattr(resp, 'agent', 'Kage')} · {resp.intent}\n{resp.text}\n")
 
 
 # --- argparse main ---------------------------------------------------------
@@ -343,6 +341,15 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     sub.add_parser("daemon", help="(internal) run the daemon process").add_argument(
         "--use-telegram", action="store_true")
+
+    # --- v3 plugin / harness CLI (Phase 1 / 5) ---
+    p_install = sub.add_parser("install", help="install a plugin")
+    p_install.add_argument("name")
+    p_remove = sub.add_parser("remove", help="remove a plugin")
+    p_remove.add_argument("name")
+    sub.add_parser("plugins", help="list installed plugins")
+    p_harness = sub.add_parser("harness", help="improvement loop control")
+    p_harness.add_argument("action", choices=["start", "stop", "run", "status"])
 
     args = parser.parse_args(argv)
     args_dict = vars(args)
@@ -429,6 +436,33 @@ def main(argv: Optional[list[str]] = None) -> int:
         else:
             r = res["response"]
             print(f"{r['agent']} · {r['intent']}\n{r['text']}")
+        return 0
+
+    if args.cmd in ("install", "remove", "plugins"):
+        from .core.plugins import PluginManager
+        sup = local_supervisor()
+        pm = PluginManager(registry=sup.registry, plugin_root="kage/plugins")
+        pm.install_all()
+        if args.cmd == "plugins":
+            for pl in pm.list_plugins():
+                print(f'  {pl["emoji"]} {pl["name"]} v{pl["version"]} — {pl["description"]}')
+            return 0
+        if args.cmd == "install":
+            print(f"installed {args.name}" if pm.install(args.name) else f"plugin '{args.name}' not found")
+            return 0
+        print(f"removed {args.name}" if pm.remove(args.name) else f"'{args.name}' not installed")
+        return 0
+
+    if args.cmd == "harness":
+        from .cli.commands import harness
+        if args.action == "start":
+            print(harness.start())
+        elif args.action == "stop":
+            print(harness.stop())
+        elif args.action == "status":
+            print(harness.status())
+        else:
+            print(harness.run_cycle({"runs": [{"agent": "supervisor", "ok": True, "durationMs": 120}]}))
         return 0
 
     if args.cmd == "repl":

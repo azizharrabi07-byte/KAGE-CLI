@@ -25,7 +25,9 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
 from .actions import ACTION_SCHEMA, Action, ActionExecutor, format_results, parse_actions
+from .addressing import parse_addressing
 from .registry import AgentRegistry
+from .session_summary import summarize as summarize_session
 
 log = logging.getLogger("kage.supervisor")
 
@@ -210,10 +212,24 @@ class Supervisor:
         return " | ".join(bits)
 
     # -- main entry ----------------------------------------------------------
-    def think(self, message: str, user_id: Optional[str] = None) -> Response:
-        """Run one supervisor turn."""
+    def think(self, message: str, user_id: Optional[str] = None,
+              target_agent: Optional[str] = None) -> Response:
+        """Run one supervisor turn.
+
+        When ``target_agent`` is set (via @mention or /agent), the message is
+        routed directly to that agent instead of the default intent logic.
+        """
         uid = user_id or self.default_user
         ctx = self.context_for(uid)
+
+        addressed = target_agent
+        cleaned = message
+        if not addressed:
+            known = self.registry.list() if self.registry else []
+            addressed, cleaned = parse_addressing(message, known)
+        if addressed:
+            return self._delegate_to_agent(addressed, cleaned, uid, ctx)
+
         intent = detect_intent(message)
         thinking = [f"parsed intent → {intent}"]
         user_name = ctx["user_name"]
@@ -231,6 +247,8 @@ class Supervisor:
                                 agent="Kage", thinking=thinking, ok=False)
             if self.memory:
                 self.memory.set(uid, parsed["key"], parsed["value"])
+                if hasattr(self.memory, "set_attribution"):
+                    self.memory.set_attribution(uid, parsed["key"], "Mira")
             return Response(
                 f'Stored **{parsed["key"]}** = `{parsed["value"]}` in long-term memory. 🧠',
                 intent="memory_add", agent="Mira", tool="memory.add", thinking=thinking,
@@ -242,7 +260,14 @@ class Supervisor:
             if value and re.search(r"\b(my name|who am i)\b", message.lower()):
                 text = f"Your name is **{value}**. 🧠"
             elif value:
-                text = f"From memory: **{value}**. 🧠"
+                agent_src = ""
+                if hasattr(self.memory, "get_attribution"):
+                    for k, v in ctx["memory"].items():
+                        if v == value:
+                            agent_src = self.memory.get_attribution(uid, k)
+                            break
+                src_tag = f" (via {agent_src})" if agent_src else ""
+                text = f"From memory: **{value}**. 🧠{src_tag}"
             else:
                 text = ("I don't have that in memory yet. Tell me with "
                         '"remember …" or "memory add <key> <value>".')
@@ -373,6 +398,33 @@ class Supervisor:
                     self.registry.discover([fx["register"]])
                 except Exception:  # noqa: BLE001
                     pass
+
+    def _delegate_to_agent(self, name: str, message: str, uid: str,
+                           ctx: Dict[str, Any]) -> Response:
+        """Route a message to a specific addressed agent."""
+        agent = self.registry.get(name, supervisor=self)
+        if agent is None:
+            return Response(f"Agent '{name}' not found. Available: "
+                            f"{', '.join(self.registry.list())}",
+                            intent="agent_not_found", agent="Kage", ok=False)
+        if not agent.is_awake:
+            try:
+                agent.wake()
+            except Exception as exc:  # noqa: BLE001
+                return Response(f"Agent '{name}' failed to wake: {exc}",
+                                agent="Kage", ok=False)
+        try:
+            result = agent.execute({"goal": message, "message": message,
+                                    "user_id": uid, "context": ctx})
+            text = ""
+            if isinstance(result, dict):
+                text = str(result.get("text", result.get("data", result)))
+            else:
+                text = str(result)
+            return Response(text, intent="addressed", agent=agent.name,
+                            thinking=[f"delegated to {name}"])
+        except Exception as exc:  # noqa: BLE001
+            return Response(f"Agent '{name}' errored: {exc}", agent="Kage", ok=False)
 
     # -- delegation to agents/tools -----------------------------------------
     def _delegate(self, agent_name: Optional[str], task: Optional[Dict[str, Any]]) -> Dict[str, Any]:

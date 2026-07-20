@@ -104,8 +104,15 @@ class KageTUI:
         rows = []
         if self.sessions:
             try:
-                for r in self.sessions.list(self.ctx()["default_user"]):
-                    rows.append({"id": str(r["id"]), "title": r.get("title", ""),
+                sessions = self.sessions.list(self.ctx()["default_user"])
+                if hasattr(self.sessions, "list_summaries"):
+                    sessions = self.sessions.list_summaries(self.ctx()["default_user"])
+                for r in sessions:
+                    summary = dict(r).get("summary", "") if hasattr(r, "keys") else ""
+                    title = str(dict(r).get("title", "session"))
+                    if summary:
+                        title = f"{title} — {summary[:40]}"
+                    rows.append({"id": str(r["id"]), "title": title,
                                  "status": r.get("status", "")})
             except Exception:  # noqa: BLE001
                 pass
@@ -126,9 +133,21 @@ class KageTUI:
             return out
         if self.supervisor is None:
             return paint("(no supervisor connected)", C.YELLOW)
-        msg = line[1:] if line.startswith("/") else line
+        target = None
+        msg = line
+        if line.startswith("/agent "):
+            parts = line.split(None, 2)
+            if len(parts) >= 3:
+                target = parts[1]
+                msg = parts[2]
+            else:
+                names = self.registry.list() if self.registry else []
+                return paint(f"usage: /agent <name> <message>. Available: {', '.join(names)}", C.YELLOW)
+        elif line.startswith("/"):
+            msg = line[1:]
         self.history.append(msg)
-        resp = self.supervisor.think(msg, user_id=self.ctx()["default_user"])
+        resp = self.supervisor.think(msg, user_id=self.ctx()["default_user"],
+                                     target_agent=target)
         head = paint(f"{getattr(resp, 'agent', 'Kage')} · {resp.intent}",
                      status_color("ok" if resp.ok else "error"), bold=True)
         return f"{head}\n{resp.text}"

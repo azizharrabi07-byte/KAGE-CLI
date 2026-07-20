@@ -106,9 +106,23 @@ class DiscordAgent(BaseAgent):
             return
         is_dm = isinstance(message.channel, discord.DMChannel)
         mentioned = self.bot.user in message.mentions
-        if not is_dm and not mentioned:
-            return
-        resp = self.supervisor.think(message.clean_content, user_id=str(message.author.id))
+
+        content = message.clean_content
+        target_agent = None
+        for mention in message.mentions:
+            name = mention.name.lower()
+            if mention != self.bot.user and name in self.supervisor.registry.list():
+                target_agent = name
+                content = content.replace(f"@{mention.name}", "").strip()
+                break
+
+        if not is_dm and not mentioned and not target_agent:
+            if not any(w.lower() in content.lower()
+                       for w in self.supervisor.registry.list()):
+                return
+
+        resp = self.supervisor.think(content, user_id=str(message.author.id),
+                                     target_agent=target_agent)
         self._apply_side_effects(resp.side_effects, str(message.author.id))
         await message.channel.send(f"{resp.text}"[:1900])
 

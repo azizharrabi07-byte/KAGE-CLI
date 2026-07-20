@@ -219,6 +219,7 @@ COMMANDS: List[Command] = [
     Command("/session", "session control: new|list|resume", "sessions"),
     Command("/version", "print KAGE version", "core"),
     Command("/exit", "quit the REPL", "core", ["/quit"]),
+    Command("/agent", "address a specific agent: /agent <name> <msg>", "agents"),
 ]
 
 HANDLERS: Dict[str, Callable] = {

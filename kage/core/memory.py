@@ -22,6 +22,7 @@ class MemoryStore:
         self.md_dir = self.root / "notes"
         self.md_dir.mkdir(parents=True, exist_ok=True)
         self._cache: Dict[str, Dict[str, str]] = self._load()
+        self._attributions: Dict[str, Dict[str, str]] = self._load_attr()
 
     def _load(self) -> Dict[str, Dict[str, str]]:
         if self.json_path.exists():
@@ -33,6 +34,21 @@ class MemoryStore:
 
     def _save(self) -> None:
         self.json_path.write_text(json.dumps(self._cache, indent=2, ensure_ascii=False))
+
+    def _attr_path(self) -> Path:
+        return self.root / "attribution.json"
+
+    def _load_attr(self) -> Dict[str, Dict[str, str]]:
+        p = self._attr_path()
+        if p.exists():
+            try:
+                return json.loads(p.read_text() or "{}")
+            except json.JSONDecodeError:
+                return {}
+        return {}
+
+    def _save_attr(self) -> None:
+        self._attr_path().write_text(json.dumps(self._attributions, indent=2, ensure_ascii=False))
 
     def _user(self, user_id: str) -> Dict[str, str]:
         return self._cache.setdefault(str(user_id), {})
@@ -49,9 +65,27 @@ class MemoryStore:
         store = self._user(user_id)
         if key in store:
             del store[key]
+            attrs = self._attributions.setdefault(str(user_id), {})
+            attrs.pop(key, None)
+            self._save_attr()
             self._save()
             return True
         return False
+
+    def set_attribution(self, user_id: str, key: str, agent: str) -> None:
+        """Record which agent stored a key."""
+        self._attributions.setdefault(str(user_id), {})[key] = agent
+        self._save_attr()
+
+    def get_attribution(self, user_id: str, key: str) -> str:
+        """Return the agent name that stored a key, or '' if unknown."""
+        return self._attributions.get(str(user_id), {}).get(key, "")
+
+    def attributed_get(self, user_id: str) -> Dict[str, Dict[str, str]]:
+        """Return {key: {'value': v, 'agent': agent}} for rich recall."""
+        store = dict(self._user(user_id))
+        attrs = self._attributions.get(str(user_id), {})
+        return {k: {"value": v, "agent": attrs.get(k, "Kage")} for k, v in store.items()}
 
     def all_users(self) -> list[str]:
         return sorted(self._cache)

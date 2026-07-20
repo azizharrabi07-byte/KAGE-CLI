@@ -41,7 +41,17 @@ class SessionStore:
             );
             """
         )
+        self._ensure_column("sessions", "summary", "")
         self.conn.commit()
+
+    def _ensure_column(self, table: str, column: str, default: str) -> None:
+        """Add a column if it doesn't exist (works on old databases)."""
+        cols = {r[1] for r in self.conn.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            safe_default = default.replace("'", "''")
+            self.conn.execute(
+                f"ALTER TABLE {table} ADD COLUMN {column} TEXT DEFAULT '{safe_default}'"
+            )
 
     # -- sessions ------------------------------------------------------------
     def create(self, user_id: str, platform: str = "cli", title: str = "New session") -> int:
@@ -93,6 +103,40 @@ class SessionStore:
         return self.conn.execute(
             "SELECT * FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)
         ).fetchall()[::-1]
+
+    # -- summaries (unified session feature) ---------------------------------
+    def set_summary(self, session_id: int, summary: str) -> bool:
+        cur = self.conn.execute(
+            "UPDATE sessions SET summary=?, updated_at=? WHERE id=?",
+            (summary, time.time(), session_id),
+        )
+        self.conn.commit()
+        return cur.rowcount > 0
+
+    def get_summary(self, session_id: int) -> str:
+        row = self.conn.execute(
+            "SELECT summary FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
+        return row["summary"] if row else ""
+
+    def get(self, session_id: int) -> Optional[sqlite3.Row]:
+        """Fetch a single session row (for cross-interface resume)."""
+        return self.conn.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
+
+    def list_summaries(self, user_id: str) -> List[sqlite3.Row]:
+        """Sessions with summaries, for the session list panel."""
+        return self.conn.execute(
+            "SELECT id, title, status, summary, platform, created_at, updated_at "
+            "FROM sessions WHERE user_id=? ORDER BY id DESC", (user_id,)
+        ).fetchall()
+
+    def message_count(self, session_id: int) -> int:
+        row = self.conn.execute(
+            "SELECT count(*) as c FROM messages WHERE session_id=?", (session_id,)
+        ).fetchone()
+        return int(row["c"]) if row else 0
 
     def close(self) -> None:
         self.conn.close()

@@ -142,7 +142,7 @@ def test_tui_history_records():
         default_user = "cli"
         registry = AgentRegistry()
         tools = None
-        def think(self, msg, user_id="cli"):
+        def think(self, msg, user_id="cli", target_agent=None):
             class R:
                 ok = True; intent = "chat"; agent = "Kage"; text = f"echo:{msg}"
             return R()

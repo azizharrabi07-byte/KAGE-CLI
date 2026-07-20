@@ -251,6 +251,15 @@ def palette() -> List[tuple]:
     return [c.to_palette() for c in COMMANDS]
 
 
+def command_names() -> List[str]:
+    """All command names (incl. aliases) for readline completion."""
+    names: List[str] = []
+    for c in COMMANDS:
+        names.append(c.name)
+        names.extend(c.aliases)
+    return sorted(set(names))
+
+
 def run_slash(line: str, ctx: Dict[str, Any]) -> Optional[str]:
     """Run a /command against a context. Returns None if not a slash command."""
     line = line.strip()

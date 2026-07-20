@@ -32,6 +32,37 @@ from ..core.workflows.branching import (
     Branch, Retry, Step, Workflow, execute_workflow,
 )
 
+# --- theme + completion (polished interface) ---
+try:
+    from .theme import C, paint, banner as _banner
+    from .completer import install_completion, suggestions
+    _THEME = True
+except Exception:  # noqa: BLE001 — degrade to plain text if theme unavailable
+    _THEME = False
+
+    class _C:  # type: ignore
+        CYAN = RESET = DIM = GREEN = YELLOW = GRAY = WHITE = ""
+    C = _C()  # type: ignore
+
+    def paint(text, color="", bold=False, enabled=None):  # type: ignore
+        return text
+
+    def _banner(version="", enabled=None):  # type: ignore
+        return f"KAGE OS v{version}"
+
+    def install_completion(commands):  # type: ignore
+        return False
+
+    def suggestions(prefix, commands, limit=12):  # type: ignore
+        return []
+
+try:
+    from .commands import command_names as _command_names
+except Exception:  # noqa: BLE001
+    def _command_names():  # type: ignore
+        return ["/help", "/agents", "/version", "/exit"]
+
+PROMPT_C = "kage❯ "
 PROVIDERS = ["openai", "anthropic", "google", "mistral", "groq", "local"]
 MODELS = {
     "openai": ["gpt-4o", "gpt-4o-mini"],
@@ -241,7 +272,7 @@ def run_command(line: str, *, output: str = "text", dry_run: bool = False) -> st
 
 
 class REPL:
-    """A minimal interactive REPL reading from stdin until /exit."""
+    """Polished interactive REPL with cyan prompt + slash-command completion."""
 
     def __init__(self, output: str = "text", dry_run: bool = False) -> None:
         self.output = output
@@ -249,31 +280,46 @@ class REPL:
         obs_reset()
 
     def banner(self) -> str:
-        return (f"KAGE OS v{__version__}  (supervisor-discord)\n"
-                f"Type /help for commands. output={self.output} dry_run={self.dry_run}")
+        """Compact banner: ASCII art if theme present, else a one-liner."""
+        if _THEME:
+            return _banner(version=__version__)
+        return f"KAGE OS v{__version__} — type /help for commands."
 
     def handle(self, line: str) -> Optional[str]:
-        if not line.strip():
+        line = line.strip()
+        if not line:
             return None
-        if line.strip() in ("/exit", "/quit"):
+        if line in ("/exit", "/quit"):
             return "__exit__"
         return run_command(line, output=self.output, dry_run=self.dry_run)
 
+    def _suggestion_block(self, prefix: str) -> str:
+        """Render matching /commands compactly (shown on a bare '/' or filter)."""
+        names = suggestions(prefix, _command_names())
+        if not names:
+            return paint("(no matching commands)", C.GRAY)
+        return "\n".join(f"  {paint(n, C.CYAN):<20}" for n in names)
+
     def loop(self, stream=None) -> None:
         stream = stream or sys.stdin
+        # Enable Tab-to-complete for /commands (no-op if readline missing).
+        install_completion(_command_names())
         print(self.banner())
+        print()
         while True:
             try:
-                line = stream.readline()
+                line = input(paint(PROMPT_C, C.CYAN, bold=True))
             except (EOFError, KeyboardInterrupt):
-                print("\nbye")
+                print("\n" + paint("bye 👋", C.CYAN))
                 break
-            if line == "":
-                print("bye")
-                break
+            stripped = line.strip()
+            # bare '/' lists commands; a partial '/x' with no exact match hints.
+            if stripped == "/":
+                print(self._suggestion_block("/"))
+                continue
             out = self.handle(line)
             if out == "__exit__":
-                print("bye")
+                print(paint("bye 👋", C.CYAN))
                 break
             if out:
                 print(out)

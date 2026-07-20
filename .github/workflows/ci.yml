@@ -51,6 +51,7 @@ jobs:
           python kage/plugins/summarizer/tests/test_summarizer.py
           python kage/tests/test_tui.py
           python kage/tests/test_tui_polish.py
+          python kage/tests/test_completer.py
       - name: Coverage
         run: |
           pip install pytest-cov

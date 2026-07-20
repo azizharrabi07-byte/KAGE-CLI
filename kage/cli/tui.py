@@ -143,7 +143,9 @@ class KageTUI:
         return self._loop_line()
 
     def _loop_line(self) -> int:
-        """Line-based fallback (pipes, tests, non-TTY)."""
+        """Line-based loop with readline Tab-completion for /commands."""
+        from .completer import install_completion, suggestions
+        install_completion(cmdmod.command_names())
         self.print(paint("KAGE REPL (line mode) — /help, /exit", C.DIM))
         while True:
             try:

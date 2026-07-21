@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { base64Encode } from "@opencode-ai/core/util/encode"
+import { base64Encode } from "@kage/core/util/encode"
 import { fixture } from "../timeline/session-timeline-stress.fixture"
 import { stressSessionHref } from "../timeline/timeline-test-helpers"
 

@@ -1,35 +1,35 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
-import { AgentV2 } from "@opencode-ai/core/agent"
-import { ModelV2 } from "@opencode-ai/core/model"
-import { SessionV2 } from "@opencode-ai/core/session"
-import { Agent } from "@opencode-ai/schema/agent"
-import { Location } from "@opencode-ai/schema/location"
-import { Model } from "@opencode-ai/schema/model"
-import { AgentAttachment, FileAttachment, Prompt, Source } from "@opencode-ai/schema/prompt"
-import { Provider } from "@opencode-ai/schema/provider"
-import { Project } from "@opencode-ai/schema/project"
-import { ProjectDirectories } from "@opencode-ai/schema/project-directories"
-import { PermissionV1 } from "@opencode-ai/schema/permission-v1"
-import { Session } from "@opencode-ai/schema/session"
-import { SessionInput } from "@opencode-ai/schema/session-input"
-import { SessionMessage } from "@opencode-ai/schema/session-message"
-import { Workspace } from "@opencode-ai/schema/workspace"
-import { Command } from "@opencode-ai/schema/command"
-import { Connection } from "@opencode-ai/schema/connection"
-import { Credential } from "@opencode-ai/schema/credential"
-import { FileSystem } from "@opencode-ai/schema/filesystem"
-import { Integration } from "@opencode-ai/schema/integration"
-import { LLM } from "@opencode-ai/schema/llm"
-import { Permission } from "@opencode-ai/schema/permission"
-import { Plugin } from "@opencode-ai/schema/plugin"
-import { Pty } from "@opencode-ai/schema/pty"
-import { Reference } from "@opencode-ai/schema/reference"
-import { SessionTodo } from "@opencode-ai/schema/session-todo"
-import { Skill } from "@opencode-ai/schema/skill"
-import { AbsolutePath, DateTimeUtcFromMillis, optional, statics } from "@opencode-ai/schema/schema"
-import { ProviderV2 } from "@opencode-ai/core/provider"
-import { PluginV2 } from "@opencode-ai/core/plugin"
+import { AgentV2 } from "@kage/core/agent"
+import { ModelV2 } from "@kage/core/model"
+import { SessionV2 } from "@kage/core/session"
+import { Agent } from "@kage/schema/agent"
+import { Location } from "@kage/schema/location"
+import { Model } from "@kage/schema/model"
+import { AgentAttachment, FileAttachment, Prompt, Source } from "@kage/schema/prompt"
+import { Provider } from "@kage/schema/provider"
+import { Project } from "@kage/schema/project"
+import { ProjectDirectories } from "@kage/schema/project-directories"
+import { PermissionV1 } from "@kage/schema/permission-v1"
+import { Session } from "@kage/schema/session"
+import { SessionInput } from "@kage/schema/session-input"
+import { SessionMessage } from "@kage/schema/session-message"
+import { Workspace } from "@kage/schema/workspace"
+import { Command } from "@kage/schema/command"
+import { Connection } from "@kage/schema/connection"
+import { Credential } from "@kage/schema/credential"
+import { FileSystem } from "@kage/schema/filesystem"
+import { Integration } from "@kage/schema/integration"
+import { LLM } from "@kage/schema/llm"
+import { Permission } from "@kage/schema/permission"
+import { Plugin } from "@kage/schema/plugin"
+import { Pty } from "@kage/schema/pty"
+import { Reference } from "@kage/schema/reference"
+import { SessionTodo } from "@kage/schema/session-todo"
+import { Skill } from "@kage/schema/skill"
+import { AbsolutePath, DateTimeUtcFromMillis, optional, statics } from "@kage/schema/schema"
+import { ProviderV2 } from "@kage/core/provider"
+import { PluginV2 } from "@kage/core/plugin"
 
 test("Core reuses the canonical shared schemas", async () => {
   const [
@@ -55,27 +55,27 @@ test("Core reuses the canonical shared schemas", async () => {
     coreSchema,
     coreWorkspace,
   ] = await Promise.all([
-    import("@opencode-ai/core/command"),
-    import("@opencode-ai/core/integration/connection"),
-    import("@opencode-ai/core/credential"),
-    import("@opencode-ai/core/filesystem"),
-    import("@opencode-ai/core/integration"),
-    import("@opencode-ai/core/location"),
-    import("@opencode-ai/llm"),
-    import("@opencode-ai/core/permission"),
-    import("@opencode-ai/core/v1/permission"),
-    import("@opencode-ai/core/project/copy"),
-    import("@opencode-ai/core/pty"),
-    import("@opencode-ai/core/project/schema"),
-    import("@opencode-ai/core/reference"),
-    import("@opencode-ai/core/session/input"),
-    import("@opencode-ai/core/session/message"),
-    import("@opencode-ai/core/session/todo"),
-    import("@opencode-ai/core/session/prompt"),
-    import("@opencode-ai/core/skill"),
-    import("@opencode-ai/core/v2-schema"),
-    import("@opencode-ai/core/schema"),
-    import("@opencode-ai/core/workspace"),
+    import("@kage/core/command"),
+    import("@kage/core/integration/connection"),
+    import("@kage/core/credential"),
+    import("@kage/core/filesystem"),
+    import("@kage/core/integration"),
+    import("@kage/core/location"),
+    import("@kage/llm"),
+    import("@kage/core/permission"),
+    import("@kage/core/v1/permission"),
+    import("@kage/core/project/copy"),
+    import("@kage/core/pty"),
+    import("@kage/core/project/schema"),
+    import("@kage/core/reference"),
+    import("@kage/core/session/input"),
+    import("@kage/core/session/message"),
+    import("@kage/core/session/todo"),
+    import("@kage/core/session/prompt"),
+    import("@kage/core/skill"),
+    import("@kage/core/v2-schema"),
+    import("@kage/core/schema"),
+    import("@kage/core/workspace"),
   ])
 
   const schemas = [

@@ -1,6 +1,6 @@
-# OpenCode Desktop
+# KAGE Desktop
 
-The OpenCode Desktop app, built with Electron.
+The KAGE Desktop app, built with Electron.
 
 ## Development
 

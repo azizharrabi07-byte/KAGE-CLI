@@ -1,0 +1,32 @@
+{
+  "skills": [
+    {
+      "id": "phone-automation",
+      "description": "Automate Android phone tasks via Termux intent commands"
+    },
+    {
+      "id": "obsidian-sync",
+      "description": "Read/write notes to Obsidian vault via local API"
+    },
+    {
+      "id": "whatsapp-bridge",
+      "description": "Send and read WhatsApp messages via Termux API"
+    },
+    {
+      "id": "workflow-engine",
+      "description": "Execute predefined multi-step workflows from workflows/ directory"
+    },
+    {
+      "id": "session-logger",
+      "description": "Log and summarize chat sessions to sessions/ directory"
+    },
+    {
+      "id": "memory-manager",
+      "description": "Query and update long_term/memories.md"
+    },
+    {
+      "id": "subagent-orchestrator",
+      "description": "Spawn and manage subagents for parallel or pipelined tasks"
+    }
+  ]
+}

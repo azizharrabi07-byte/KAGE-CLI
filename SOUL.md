@@ -35,6 +35,6 @@ after completion.
 
 ## Foundation
 
-KAGE is built on the [OpenCode](https://github.com/anomalyco/opencode) foundation,
+KAGE is built on the [KAGE](https://github.com/anomalyco/kage) foundation,
 rebranded and extended with unified sessions, shared memory with attribution,
 addressable agents, and a continuous-improvement harness.

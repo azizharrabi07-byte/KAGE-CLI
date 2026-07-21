@@ -6,14 +6,14 @@ export function wslServerIdToRestart(servers: WslServerItem[], distro: string) {
 
 export function clearWslDistroState(
   distroProbes: Record<string, WslDistroProbe>,
-  opencodeChecks: Record<string, WslOpencodeCheck>,
+  kageChecks: Record<string, WslOpencodeCheck>,
   distro: string,
 ) {
   const nextDistroProbes = { ...distroProbes }
-  const nextOpencodeChecks = { ...opencodeChecks }
+  const nextOpencodeChecks = { ...kageChecks }
   delete nextDistroProbes[distro]
   delete nextOpencodeChecks[distro]
-  return { distroProbes: nextDistroProbes, opencodeChecks: nextOpencodeChecks }
+  return { distroProbes: nextDistroProbes, kageChecks: nextOpencodeChecks }
 }
 
 export function wslTerminalArgs(distro?: string | null) {

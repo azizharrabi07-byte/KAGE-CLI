@@ -5,4 +5,7 @@ build/
 *.tsbuildinfo
 .env
 .kage-cache/
+.kage/
+__pycache__/
+*.pyc
 bun.lockb

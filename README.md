@@ -1,4 +1,4 @@
-> **KAGE** — a fork of [OpenCode](https://github.com/anomalyco/opencode), rebranded as an AI Operating System.
+> **KAGE** — a fork of [KAGE](https://github.com/anomalyco/kage), rebranded as an AI Operating System.
 
 <p align="center">
   <a href="https://github.com/azizharrabi07-byte/KAGE-CLI">
@@ -13,7 +13,7 @@
 <p align="center">
   <a href="https://github.com/azizharrabi07-byte/KAGE-CLI/discord"><img alt="Discord" src="https://img.shields.io/discord/1391832426048651334?style=flat-square&label=discord" /></a>
   <a href="https://www.npmjs.com/package/kage-ai"><img alt="npm" src="https://img.shields.io/npm/v/kage-ai?style=flat-square" /></a>
-  <a href="https://github.com/anomalyco/opencode/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/opencode/publish.yml?style=flat-square&branch=dev" /></a>
+  <a href="https://github.com/anomalyco/kage/actions/workflows/publish.yml"><img alt="Build status" src="https://img.shields.io/github/actions/workflow/status/anomalyco/kage/publish.yml?style=flat-square&branch=dev" /></a>
 </p>
 
 <p align="center">
@@ -41,7 +41,7 @@
   <a href="README.vi.md">Tiếng Việt</a>
 </p>
 
-[![OpenCode Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://github.com/azizharrabi07-byte/KAGE-CLI)
+[![KAGE Terminal UI](packages/web/src/assets/lander/screenshot.png)](https://github.com/azizharrabi07-byte/KAGE-CLI)
 
 ---
 
@@ -53,14 +53,14 @@ curl -fsSL https://github.com/azizharrabi07-byte/KAGE-CLI/install | bash
 
 # Package managers
 npm i -g kage-ai@latest        # or bun/pnpm/yarn
-scoop install opencode             # Windows
-choco install opencode             # Windows
-brew install anomalyco/tap/opencode # macOS and Linux (recommended, always up to date)
-brew install opencode              # macOS and Linux (official brew formula, updated less)
-sudo pacman -S opencode            # Arch Linux (Stable)
-paru -S opencode-bin               # Arch Linux (Latest from AUR)
-mise use -g opencode               # Any OS
-nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev branch
+scoop install kage             # Windows
+choco install kage             # Windows
+brew install anomalyco/tap/kage # macOS and Linux (recommended, always up to date)
+brew install kage              # macOS and Linux (official brew formula, updated less)
+sudo pacman -S kage            # Arch Linux (Stable)
+paru -S kage-bin               # Arch Linux (Latest from AUR)
+mise use -g kage               # Any OS
+nix run nixpkgs#kage           # or github:anomalyco/kage for latest dev branch
 ```
 
 > [!TIP]
@@ -68,20 +68,20 @@ nix run nixpkgs#opencode           # or github:anomalyco/opencode for latest dev
 
 ### Desktop App (BETA)
 
-OpenCode is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/opencode/releases) or [opencode.ai/download](https://github.com/azizharrabi07-byte/KAGE-CLI/download).
+KAGE is also available as a desktop application. Download directly from the [releases page](https://github.com/anomalyco/kage/releases) or [kage.ai/download](https://github.com/azizharrabi07-byte/KAGE-CLI/download).
 
 | Platform              | Download                           |
 | --------------------- | ---------------------------------- |
-| macOS (Apple Silicon) | `opencode-desktop-mac-arm64.dmg`   |
-| macOS (Intel)         | `opencode-desktop-mac-x64.dmg`     |
-| Windows               | `opencode-desktop-windows-x64.exe` |
+| macOS (Apple Silicon) | `kage-desktop-mac-arm64.dmg`   |
+| macOS (Intel)         | `kage-desktop-mac-x64.dmg`     |
+| Windows               | `kage-desktop-windows-x64.exe` |
 | Linux                 | `.deb`, `.rpm`, or `.AppImage`     |
 
 ```bash
 # macOS (Homebrew)
-brew install --cask opencode-desktop
+brew install --cask kage-desktop
 # Windows (Scoop)
-scoop bucket add extras; scoop install extras/opencode-desktop
+scoop bucket add extras; scoop install extras/kage-desktop
 ```
 
 #### Installation Directory
@@ -91,7 +91,7 @@ The install script respects the following priority order for the installation pa
 1. `$OPENCODE_INSTALL_DIR` - Custom installation directory
 2. `$XDG_BIN_DIR` - XDG Base Directory Specification compliant path
 3. `$HOME/bin` - Standard user binary directory (if it exists or can be created)
-4. `$HOME/.opencode/bin` - Default fallback
+4. `$HOME/.kage/bin` - Default fallback
 
 ```bash
 # Examples
@@ -101,7 +101,7 @@ XDG_BIN_DIR=$HOME/.local/bin curl -fsSL https://github.com/azizharrabi07-byte/KA
 
 ### Agents
 
-OpenCode includes two built-in agents you can switch between with the `Tab` key.
+KAGE includes two built-in agents you can switch between with the `Tab` key.
 
 - **build** - Default, full-access agent for development work
 - **plan** - Read-only agent for analysis and code exploration
@@ -116,16 +116,16 @@ Learn more about [agents](https://github.com/azizharrabi07-byte/KAGE-CLI/docs/ag
 
 ### Documentation
 
-For more info on how to configure OpenCode, [**head over to our docs**](https://github.com/azizharrabi07-byte/KAGE-CLI/docs).
+For more info on how to configure KAGE, [**head over to our docs**](https://github.com/azizharrabi07-byte/KAGE-CLI/docs).
 
 ### Contributing
 
-If you're interested in contributing to OpenCode, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
+If you're interested in contributing to KAGE, please read our [contributing docs](./CONTRIBUTING.md) before submitting a pull request.
 
-### Building on OpenCode
+### Building on KAGE
 
-If you are working on a project that's related to OpenCode and is using "opencode" as part of its name, for example "opencode-dashboard" or "opencode-mobile", please add a note to your README to clarify that it is not built by the OpenCode team and is not affiliated with us in any way.
+If you are working on a project that's related to KAGE and is using "kage" as part of its name, for example "kage-dashboard" or "kage-mobile", please add a note to your README to clarify that it is not built by the KAGE team and is not affiliated with us in any way.
 
 ---
 
-**Join our community** [Discord](https://discord.gg/opencode) | [X.com](https://x.com/opencode)
+**Join our community** [Discord](https://discord.gg/kage) | [X.com](https://x.com/kage)

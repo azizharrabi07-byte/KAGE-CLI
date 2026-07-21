@@ -1,5 +1,5 @@
 {
-  description = "OpenCode development flake";
+  description = "KAGE development flake";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
@@ -39,11 +39,11 @@
             };
           in
           rec {
-            opencode = final.callPackage ./nix/opencode.nix {
+            kage = final.callPackage ./nix/kage.nix {
               inherit node_modules;
             };
-            opencode-desktop = final.callPackage ./nix/desktop.nix {
-              inherit opencode;
+            kage-desktop = final.callPackage ./nix/desktop.nix {
+              inherit kage;
             };
           };
       };
@@ -56,12 +56,12 @@
           };
         in
         rec {
-          default = opencode;
-          opencode = pkgs.callPackage ./nix/opencode.nix {
+          default = kage;
+          kage = pkgs.callPackage ./nix/kage.nix {
             inherit node_modules;
           };
-          opencode-desktop = pkgs.callPackage ./nix/desktop.nix {
-            inherit opencode;
+          kage-desktop = pkgs.callPackage ./nix/desktop.nix {
+            inherit kage;
           };
           # Updater derivation with fakeHash - build fails and reveals correct hash
           node_modules_updater = node_modules.override {

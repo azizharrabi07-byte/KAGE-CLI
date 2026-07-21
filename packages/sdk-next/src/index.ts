@@ -1,7 +1,7 @@
-export * as OpenCode from "./opencode"
+export * as KAGE from "./kage"
 export * as Tool from "./tool"
 
-export { ClientError } from "@opencode-ai/client/effect"
+export { ClientError } from "@kage/client/effect"
 export {
   AbsolutePath,
   Agent,
@@ -13,5 +13,5 @@ export {
   Session,
   SessionInput,
   SessionMessage,
-} from "@opencode-ai/client/effect"
-export type { OpenCodeEvent } from "@opencode-ai/client/effect"
+} from "@kage/client/effect"
+export type { KAGEEvent } from "@kage/client/effect"

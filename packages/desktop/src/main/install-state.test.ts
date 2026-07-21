@@ -10,10 +10,10 @@ describe("hasExistingAppState", () => {
     expect(hasExistingAppState([file("Local State"), directory("Crashpad")])).toBe(false)
   })
 
-  test("recognizes state written by an earlier OpenCode launch", () => {
-    expect(hasExistingAppState([file("opencode.settings")])).toBe(true)
-    expect(hasExistingAppState([file("opencode.global.dat")])).toBe(true)
+  test("recognizes state written by an earlier KAGE launch", () => {
+    expect(hasExistingAppState([file("kage.settings")])).toBe(true)
+    expect(hasExistingAppState([file("kage.global.dat")])).toBe(true)
     expect(hasExistingAppState([file("window-state-abc.json")])).toBe(true)
-    expect(hasExistingAppState([directory("opencode")])).toBe(true)
+    expect(hasExistingAppState([directory("kage")])).toBe(true)
   })
 })

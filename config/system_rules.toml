@@ -1,0 +1,20 @@
+[general]
+log_level = "info"
+max_sessions = 100
+timezone = "UTC+2"
+
+[security]
+require_confirmation = true
+internet_access = false
+sdcard_protection = true
+
+[performance]
+max_context_tokens = 3000
+lazy_load_enabled = true
+level1_max_chars = 1300
+level2_max_chars = 5000
+
+[ui]
+prompt_prefix = "kage"
+show_token_count = false
+color_theme = "dark"

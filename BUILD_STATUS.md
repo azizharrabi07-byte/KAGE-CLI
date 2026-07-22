@@ -6,9 +6,11 @@
 The bun package manager requires filesystem support for hard links and symlinks, which is unavailable in the current container environment (Docker overlay FS). This causes EPERM errors during `bun install` for many packages.
 
 ### Blockers
-- `bun install` EPERM on hard link creation (overlay filesystem)
+- `bun install` EPERM on hard link creation (Docker overlay filesystem)
 - Missing transitive dependencies for `@opentui/solid` (babel plugins, core-js, etc.)
 - `husky` postinstall script fails (binary not found)
+- `npm install` hangs indefinitely in this environment (network/registry)
+- Full flat catalog fix attempted: all `catalog:` → version numbers, `workspace:*` → `*`, workspaces array fix. npm cannot resolve the dependency tree.
 
 ### Resolution
 - Pivot to Python KAGE OS (see below)
